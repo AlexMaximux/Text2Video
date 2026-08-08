@@ -1,0 +1,52 @@
+================================================================================
+                      SUMMARY OF ELEVENLABS CHAT & WORK DONE
+================================================================================
+
+1. OVERVIEW & OBJECTIVE
+--------------------------------------------------------------------------------
+The user requested a Python automation script based on the Browser2API framework
+that opens Chrome, navigates to ElevenLabs Text-to-Speech synthesis page, selects 
+the voice ID '2styzLg7OSeuhPP6uQ26', inputs text from 'senario.txt', clicks 
+'Generate speech', automatically downloads the generated audio as 'Senario.mp3', 
+and closes the browser automatically upon completion.
+
+2. CORE IMPLEMENTATION & CHANGES
+--------------------------------------------------------------------------------
+A. Core Library Update:
+   - File: src/browser2api/types.py
+   - Added `ELEVENLABS = "elevenlabs"` to the `Platform` Enum.
+
+B. ElevenLabs Automation Script:
+   - Files: examples/elevenlabs_prompt.py & Text2Video/elevenlabs_prompt.py
+   - Automates navigation to https://elevenlabs.io/app/speech-synthesis/text-to-speech
+   - Selects voice ID '2styzLg7OSeuhPP6uQ26' via voice picker & search input.
+   - Pastes text from 'senario.txt' into text box.
+   - Clicks 'Generate speech' button.
+   - Intercepts & downloads audio payload as 'Senario.mp3' (using 3 robust 
+     download methods: Network payload interception, UI download button trigger, 
+     and HTML5 Audio element fallback).
+   - Automatically closes browser and exits process upon completion.
+
+C. Project Organization & Directory Structure:
+   - Created project directory: `Text2Video/`
+   - Grouped 3 main workflow scripts into `Text2Video/`:
+     1) `elevenlabs_prompt.py` (Voice synthesis & audio downloader)
+     2) `claude_prompt.py` (Script generator with Claude AI)
+     3) `batch_generate_millo.py` (Visual asset generator with Google Flow)
+   - Added comprehensive documentation: `Text2Video/README.md`
+
+3. EXAMPLES OF COMMANDS TO RUN
+--------------------------------------------------------------------------------
+A) Standard ElevenLabs Speech Generation & Download:
+   python Text2Video/elevenlabs_prompt.py --voice 2styzLg7OSeuhPP6uQ26 --input senario.txt --output Senario.mp3
+
+B) ElevenLabs with Persistent Chrome Profile:
+   python Text2Video/elevenlabs_prompt.py --profile "Profile 1" --voice 2styzLg7OSeuhPP6uQ26 --input senario.txt --output Senario.mp3
+
+C) Claude Script Generator:
+   python Text2Video/claude_prompt.py --profile "Profile 1" --auto-followup
+
+D) Google Flow Image Generator:
+   python Text2Video/batch_generate_millo.py --prompts image_prompts.txt --reference milo.jpeg --model nano-banana-2 --output-dir output --delay 8.0
+
+================================================================================

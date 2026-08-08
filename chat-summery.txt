@@ -1,0 +1,159 @@
+Edited senario.txt
+Edited README.md
+Viewed README.md:140-148
+
+# 📋 Text2Video Project Summary & Command Guide
+
+This summary covers all features, module integrations, project architecture, and **every command line tool** available in the `Text2Video` framework.
+
+---
+
+## 🏗️ Project Architecture & Folder Structure
+
+All workflows store their outputs in isolated, self-contained project directories under `projects/`:
+
+```text
+Text2Video/
+├── claude_prompt.py           # 1. Script Generation (Claude.ai)
+├── elevenlabs_prompt.py       # 2. Voiceover Generation (ElevenLabs)
+├── transcribe_audio.py        # 3. Whisper Audio Transcription & Word Timestamps
+├── generate_image_prompts.py  # 4. Prompt-Making Engine (Claude.ai)
+├── batch_generate_millo.py    # 5. Batch Image Generation (Google Flow)
+├── make_final_video.py        # 6. Video Assembly & ASS Subtitle Burning
+├── pipeline.py                # Master End-to-End Runner
+├── history_topics.txt         # History Deduplication Registry
+├── milo.jpeg                  # Default Reference Image for Google Flow
+│
+└── projects/
+    └── Video_20260807_1937_WiredToBelong/
+        ├── senario.txt        # Generated narration script
+        ├── voice.mp3          # Generated ElevenLabs voiceover
+        ├── transcript.txt     # [MM:SS] timestamped script
+        ├── words.json         # Word-by-word timestamps for subtitles
+        ├── image_prompts.txt  # Detailed visual prompts for Google Flow
+        ├── images/            # Generated doodle images (00-00.jpg, 00-04.jpg, ...)
+        └── final_video.mp4    # Final MP4 video with burned captions
+```
+
+> **Smart Project Resolution:** In all commands, if you omit `--project`, the tools automatically detect and work on the **most recently created project directory**.
+
+---
+
+## 🚀 Full Command Reference Guide
+
+### 1. Master Pipeline Command (Automate All 6 Steps)
+
+To run the entire end-to-end process automatically:
+
+```bash
+python pipeline.py --profile "Profile 1" --voice 2styzLg7OSeuhPP6uQ26 --add-captions
+```
+
+**Full Master Pipeline with Styling Options:**
+```bash
+python pipeline.py \
+  --profile "Profile 1" \
+  --voice 2styzLg7OSeuhPP6uQ26 \
+  --add-captions \
+  --font-name "Arial Black" \
+  --font-size 48 \
+  --text-color "#FFFFFF" \
+  --highlight-color "#FFD60A" \
+  --position bottom
+```
+
+*Pipeline Flags:*
+- `--project "Video_01"` / `-p "Video_01"`: Execute on a specific project directory.
+- `--skip-images`: Skip Google Flow image generation (Step 5).
+
+---
+
+### 2. Step-by-Step Individual Commands
+
+#### Step 1: Script Generation via Claude (`claude_prompt.py`)
+Generates YouTube narration, deduplicates against `history_topics.txt`, and creates a new project directory:
+```bash
+# Auto-create timestamped project folder (e.g. projects/Video_20260807_1937_Title/)
+python claude_prompt.py --profile "Profile 1" --auto-followup
+
+# Create custom named project folder (projects/Video_01/)
+python claude_prompt.py --profile "Profile 1" --auto-followup --project "Video_01"
+```
+
+#### Step 2: Voiceover Generation via ElevenLabs (`elevenlabs_prompt.py`)
+Pastes scenario text into ElevenLabs, downloads audio, and saves `voice.mp3` into project folder:
+```bash
+# Active/latest project
+python elevenlabs_prompt.py --profile "Profile 1" --voice 2styzLg7OSeuhPP6uQ26
+
+# Specific project
+python elevenlabs_prompt.py --profile "Profile 1" --voice 2styzLg7OSeuhPP6uQ26 --project "Video_01"
+```
+
+#### Step 3: Transcription & Word Timestamps (`transcribe_audio.py`)
+Uses OpenAI Whisper to generate `transcript.txt` and `words.json`:
+```bash
+# Active/latest project
+python transcribe_audio.py
+
+# Specific project
+python transcribe_audio.py --project "Video_01"
+
+# Custom Whisper model size (tiny, base, small, medium, large)
+python transcribe_audio.py --project "Video_01" --model small
+```
+
+#### Step 4: Prompt-Making via Claude (`generate_image_prompts.py`)
+Converts `transcript.txt` into Google Flow `image_prompts.txt` using channel 2D doodle visual DNA rules:
+```bash
+# Active/latest project
+python generate_image_prompts.py --profile "Profile 1"
+
+# Specific project
+python generate_image_prompts.py --project "Video_01" --profile "Profile 1"
+```
+
+#### Step 5: Batch Image Generation via Google Flow (`batch_generate_millo.py`)
+Generates 16:9 doodle images into `images/` folder using reference image `milo.jpeg`:
+```bash
+# Active/latest project (auto-detects transcript.txt or image_prompts.txt)
+python batch_generate_millo.py --reference milo.jpeg --model nano-banana-2 --delay 8.0
+
+# Specific project
+python batch_generate_millo.py --project "Video_01" --reference milo.jpeg --model nano-banana-2 --delay 8.0
+
+# Explicitly passing prompts file
+python batch_generate_millo.py \
+  --project "Video_01" \
+  --prompts image_prompts.txt \
+  --reference milo.jpeg \
+  --model nano-banana-2 \
+  --delay 8.0
+```
+
+#### Step 6: Assemble Final Video with Custom Captions (`make_final_video.py`)
+Stitches images, audio, and word-highlighted ASS captions into `final_video.mp4`:
+```bash
+# Basic video assembly with captions on active project
+python make_final_video.py --add-captions
+
+# Full styling & large font customization (e.g. Font size 80)
+python make_final_video.py \
+  --project "Video_01" \
+  --add-captions \
+  --font-name "Arial Black" \
+  --font-size 80 \
+  --text-color "#FFFFFF" \
+  --highlight-color "#FFD60A" \
+  --outline-color "#000000" \
+  --position bottom \
+  --on-mismatch pad
+```
+
+*`make_final_video.py` Flags:*
+- `--on-mismatch pad` (Default): Automatically holds the last image if image count is less than timestamp count.
+- `--font-name`: Subtitle font family (e.g., `'Arial Black'`, `'Impact'`, `'Montserrat'`).
+- `--font-size`: Subtitle font size in px (e.g., `48`, `80`).
+- `--text-color`: Main subtitle hex color (`#FFFFFF`).
+- `--highlight-color`: Active spoken word highlight hex color (`#FFD60A`).
+- `--position`: Subtitle position (`bottom`, `middle`, `top`).

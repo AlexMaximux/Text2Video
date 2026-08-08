@@ -1,0 +1,3 @@
+browser2api
+playwright
+openai-whisper

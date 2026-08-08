@@ -1,0 +1,55 @@
+================================================================================
+                     SUMMARY OF CLAUDE AUTOMATION CHAT
+================================================================================
+
+1. OVERVIEW & OBJECTIVE
+-----------------------
+Created an automated Python script (`examples/claude_prompt.py`) using `browser2api`
+to automate browser interactions with Claude (https://claude.ai/new).
+The workflow executes a 2-phase viral educational YouTube scriptwriting engine:
+  - Phase 1: Topic Generation (15 viral title ideas)
+  - Phase 2: Selection & Full Voice-Over Script Construction (750–950 words)
+
+2. CORE CODE CHANGES & ADDITIONS
+--------------------------------
+- Added `CLAUDE = "claude"` to Platform enum in `src/browser2api/types.py`.
+- Updated `src/browser2api/browser.py`:
+  - Added `get_system_chrome_user_data_dir()` for cross-platform Chrome path resolution.
+  - Added `prepare_custom_profile_dir()` to copy `Local State` and profile data into
+    an isolated `browser_data` folder. This solves Chrome's `SingletonLock` error
+    and allows running automation using system Chrome profiles (`Profile 1`, etc.)
+    even while the main Google Chrome application remains open.
+- Created `examples/claude_prompt.py`:
+  - Phase 1 prompt embedding for viral educational doodle animation scripts.
+  - Phase 2 prompt embedding:
+    "choose one of them that you think it would have most potential to have more views and debate in Youtube and BUILD THE SCRIPT
+     The output just should be the Titel and ready Script not any extra information at the first or end"
+  - `wait_for_claude_response()` to detect response completion on Claude.ai.
+  - `clean_script_output()` to strip meta-commentary while preserving the selected Title and raw Script.
+  - Automatically saves output to `senario.txt`.
+
+3. HOW TO RUN THE SCRIPT
+------------------------
+# 2-Phase automated execution with Chrome Profile 1:
+python examples/claude_prompt.py --profile "Profile 1" --auto-followup
+
+# Send Phase 1 prompt only:
+python examples/claude_prompt.py --profile "Profile 1" --send
+
+# Specify custom output file:
+python examples/claude_prompt.py --profile "Profile 1" --auto-followup --output senario.txt
+
+4. DISCOVERED CHROME PROFILES ON SYSTEM
+---------------------------------------
+Base Path: /Users/nersibayat/Library/Application Support/Google/Chrome
+  - Default: Nersi (nersi55@gmail.com)
+  - Profile 1: Kasra (pelash@gmail.com)
+  - Profile 2: New (newexuk@gmail.com)
+  - Profile 5: NiNi (firefox1355@gmail.com)
+  - Profile 6: google flow-video (namnam1359m@gmail.com)
+  - Profile 7: Tw
+  - Profile 8: Dispatch (eramdis@gmail.com)
+  - Profile 9: NiNi (alexcari2222@gmail.com)
+  - Profile 10: Persian Twitter (namnam1359m@gmail.com)
+
+================================================================================

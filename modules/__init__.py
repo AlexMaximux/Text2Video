@@ -1,0 +1,3 @@
+"""
+Modular Slideshow Generator Package
+"""

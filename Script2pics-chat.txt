@@ -1,0 +1,63 @@
+================================================================================
+                    Script2pics Chat & Workflow Summary
+================================================================================
+
+1. OVERVIEW & OBJECTIVE
+--------------------------------------------------------------------------------
+This conversation focused on fixing, automating, and optimizing the complete
+YouTube "Script to Pictures" pipeline (Browser2API), specifically targeting:
+  - Google Flow batch image generation with character reference image (milo.jpeg).
+  - Claude.ai automated YouTube scriptwriting (Phase 1 topics -> Phase 2 script).
+  - ElevenLabs TTS audio narration generation.
+
+
+2. GOOGLE FLOW BATCH GENERATION FIXES (examples/batch_generate_millo.py)
+--------------------------------------------------------------------------------
+- Reference Image Attachment (milo.jpeg / millo_reference.jpeg):
+  * Identified root cause: The local reference image file was not uploaded natively
+    via Playwright's file input, causing Google Flow to fallback to old assets.
+  * Added direct file input upload: page.set_input_files('input[type="file"]', ref_abs_path).
+  * Automated Asset Manager drawer interaction (+ button -> search "millo" -> select card
+    -> click "Add to Prompt" button).
+  * Discovered that Google Flow places reference chips ABOVE the prompt input box, not
+    inside contenteditable="true". Updated verification logic to check the prompt container.
+
+- Premature Submit / Prompt Splitting Fix:
+  * Identified issue: Using newlines (\n) in the prompt caused Playwright's keyboard.type
+    to press the Enter key, prematurely submitting the instruction prefix as a separate prompt.
+  * Fix: Joined prompt prefix ("Use the reference picture and make the picture according
+    to the instructions below:") with the prompt text using a single space (" "), and updated
+    client._fill_prompt to sanitize all newlines into spaces before typing.
+
+- Prompt Cleaning (LLM Artifacts):
+  * Stripped all leftover [span_10](start_span)[span_10](end_span) tags from image_prompts.txt
+    and added regex sanitization in parse_prompts().
+
+
+3. CLAUDE SCRIPTWRITING AUTOMATION (examples/claude_prompt.py)
+--------------------------------------------------------------------------------
+- Two-Phase Automated Workflow:
+  * Phase 1: Sends viral YouTube topic generation prompt.
+  * Phase 2: Automatically detects completion, selects the highest potential topic,
+    generates the full narrator voice-over script, strips preamble commentary, and saves
+    the clean script to senario.txt.
+  * Added CLI support for persistent Chrome profiles (--profile "Profile 1") and --auto-followup.
+
+
+4. PIPELINE USAGE COMMANDS (Text2Video/myOwnreadme.mt)
+--------------------------------------------------------------------------------
+- Generate Claude Script:
+  python examples/claude_prompt.py --profile "Profile 1" --auto-followup
+
+- Generate ElevenLabs Audio:
+  python examples/elevenlabs_prompt.py --profile "Profile 1" --voice 2styzLg7OSeuhPP6uQ26 --input senario.txt --output Senario.mp3
+
+- Generate Google Flow Batch Images:
+  python examples/batch_generate_millo.py \
+    --prompts image_prompts.txt \
+    --reference milo.jpeg \
+    --model nano-banana-2 \
+    --output-dir output \
+    --delay 8.0
+
+================================================================================
