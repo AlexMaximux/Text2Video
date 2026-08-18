@@ -143,12 +143,20 @@ def append_history_topic(title: str):
             f.write(f"{title_clean}\n")
 
 
-def build_phase_1_prompt() -> str:
-    """Build Phase 1 prompt with dynamic exclusion of past topics."""
+def build_phase_1_prompt(topic: str | None = None) -> str:
+    """Build Phase 1 prompt with optional topic focus and dynamic exclusion of past topics."""
     history = load_history_topics()
     prompt = PROMPT_PHASE_1
+    if topic:
+        prompt += (
+            f"\n\n---\n\n"
+            f"SPECIFIC TOPIC REQUESTED BY USER:\n"
+            f"The user wants a script specifically focused on or related to this topic:\n"
+            f"\"{topic}\"\n"
+            f"Please generate 15 viral video title ideas specifically around or related to this exact topic."
+        )
     if history:
-        history_list = "\n".join(f"- {topic}" for topic in history)
+        history_list = "\n".join(f"- {t}" for t in history)
         prompt += (
             f"\n\n---\n\n"
             f"PREVIOUSLY CREATED TOPICS (DO NOT REPEAT OR DUPLICATE):\n"
@@ -187,34 +195,74 @@ def archive_script_output(script_text: str, project_name: str | None = None, out
     return main_path, archive_path
 
 
-async def wait_for_claude_response(page, timeout_seconds: int = 180) -> bool:
-    """Wait until Claude finishes generating its response."""
-    print("[+] Waiting for Claude's response to complete...")
+async def get_all_claude_responses(page) -> list[str]:
+    """Extract text content of each response from Claude on the page using browser DOM evaluation."""
+    script = """() => {
+        let nodes = Array.from(document.querySelectorAll('[data-message-author-role="assistant"]'));
+        if (nodes.length === 0) {
+            const candidates = Array.from(document.querySelectorAll('div.font-claude-message, div[data-is-streaming]'));
+            nodes = candidates.filter(c => !candidates.some(other => other !== c && other.contains(c)));
+        }
+        if (nodes.length === 0) {
+            const candidates = Array.from(document.querySelectorAll('div.prose'));
+            nodes = candidates.filter(c => !candidates.some(other => other !== c && other.contains(c)));
+        }
+        return nodes.map(n => (n.innerText || "").trim()).filter(t => t && t.length > 20);
+    }"""
+    try:
+        results = await page.evaluate(script)
+        if isinstance(results, list):
+            return [r.strip() for r in results if r and len(r.strip()) > 20]
+    except Exception:
+        pass
+    return []
+
+
+async def wait_for_claude_response(page, expected_turn: int = 1, timeout_seconds: int = 300) -> str:
+    """Wait for Claude to finish generating the expected response turn (1 for Phase 1, 2 for Phase 2).
+    Returns the raw text of that response.
+    """
+    print(f"[+] Waiting for Claude response turn #{expected_turn} to complete...")
     start_time = asyncio.get_event_loop().time()
-    await asyncio.sleep(4)  # Wait for generation to start
+    await asyncio.sleep(4)  # Wait for prompt submission & streaming startup
+
+    last_text = ""
+    stable_count = 0
 
     while (asyncio.get_event_loop().time() - start_time) < timeout_seconds:
-        # Check if Stop response button is visible
-        stop_btn = page.locator('button[aria-label*="Stop"], button[aria-label*="stop"]').first
+        # Check if stop button is visible
+        is_streaming = False
         try:
-            if await stop_btn.is_visible(timeout=1000):
-                await asyncio.sleep(3)
-                continue
+            stop_btn = page.locator('button[aria-label*="Stop" i], button[data-testid*="stop" i]').first
+            if await stop_btn.is_visible(timeout=500):
+                is_streaming = True
         except Exception:
             pass
 
-        # Check if input box is ready
-        try:
-            input_box = page.locator('div[contenteditable="true"]').first
-            if await input_box.is_visible(timeout=1000):
-                await asyncio.sleep(2)
-                return True
-        except Exception:
-            pass
+        responses = await get_all_claude_responses(page)
 
-        await asyncio.sleep(3)
+        if len(responses) >= expected_turn:
+            target_text = responses[expected_turn - 1]
 
-    return False
+            # Fallback for turn 2 if index exact mismatch happens
+            if expected_turn == 2 and ("15 Viral Title Ideas" in target_text or "Reply with a number" in target_text):
+                if len(responses) > expected_turn:
+                    target_text = responses[-1]
+
+            if target_text and len(target_text) > 30:
+                if target_text == last_text and not is_streaming:
+                    stable_count += 1
+                    if stable_count >= 3:  # Text unchanged across 3 checks (~6s) and stop button gone
+                        word_count = len(target_text.split())
+                        print(f"[✓] Turn #{expected_turn} complete! ({word_count} words)")
+                        return target_text
+                else:
+                    stable_count = 0
+                    last_text = target_text
+
+        await asyncio.sleep(2)
+
+    return last_text
 
 
 def clean_script_output(text: str) -> str:
@@ -224,6 +272,8 @@ def clean_script_output(text: str) -> str:
     started = False
 
     preamble_triggers = [
+        "thought for",
+        "thinking",
         "the strongest pick",
         "here's why",
         "here is the full script",
@@ -266,35 +316,13 @@ def clean_script_output(text: str) -> str:
     return "\n".join(cleaned).strip()
 
 
-async def extract_last_claude_response(page) -> str:
-    """Extract text from the final response message on Claude.ai."""
-    selectors = [
-        'div.font-claude-message',
-        'div[data-is-streaming="false"]',
-        'div.prose',
-        'div[class*="font-claude-message"]',
-        'div.font-serif',
-    ]
-    for sel in selectors:
-        try:
-            elems = page.locator(sel)
-            count = await elems.count()
-            if count > 0:
-                last_elem = elems.nth(count - 1)
-                text = await last_elem.inner_text()
-                if text and len(text.strip()) > 30:
-                    return clean_script_output(text.strip())
-        except Exception:
-            continue
-    return ""
-
-
 async def open_claude_and_run_workflow(
     send_automatically: bool = False,
     auto_followup: bool = False,
     profile_directory: str | None = None,
     output_file: str = "senario.txt",
     project_name: str | None = None,
+    topic: str | None = None,
 ):
     bm = BrowserManager()
 
@@ -342,7 +370,7 @@ async def open_claude_and_run_workflow(
                     continue
 
         if input_element:
-            phase_1_prompt = build_phase_1_prompt()
+            phase_1_prompt = build_phase_1_prompt(topic=topic)
             print("[+] Inserting Phase 1 prompt (Topic Generation with History Exclusion)...")
             await input_element.focus()
             await asyncio.sleep(0.5)
@@ -379,8 +407,8 @@ async def open_claude_and_run_workflow(
 
                 # If auto-followup is requested, wait for Phase 1 response then send Phase 2
                 if auto_followup:
-                    completed = await wait_for_claude_response(page, timeout_seconds=180)
-                    if completed:
+                    phase_1_text = await wait_for_claude_response(page, expected_turn=1, timeout_seconds=180)
+                    if phase_1_text:
                         print("\n[+] Phase 1 complete! Preparing Phase 2 prompt...")
                         await asyncio.sleep(2)
 
@@ -420,12 +448,10 @@ async def open_claude_and_run_workflow(
                                 print("[✓] Phase 2 sent via Enter!")
 
                             # Wait for Phase 2 (full script) to finish
-                            await wait_for_claude_response(page, timeout_seconds=300)
+                            phase_2_text = await wait_for_claude_response(page, expected_turn=2, timeout_seconds=300)
                             print("[✓] Phase 2 complete! Extracting generated script output...")
 
-                            # Extract final script text and write to output file
-                            await asyncio.sleep(2)
-                            script_text = await extract_last_claude_response(page)
+                            script_text = clean_script_output(phase_2_text)
                             if script_text:
                                 main_p, archive_p = archive_script_output(script_text, project_name=project_name, output_file=output_file)
                                 word_count = len(script_text.split())
@@ -434,8 +460,13 @@ async def open_claude_and_run_workflow(
                                 print(f"[✓] HISTORY UPDATED in: {HISTORY_FILE.resolve()}")
                             else:
                                 print(f"[!] Could not automatically extract text. Output remains visible in browser.")
-        else:
-            print("[!] Could not locate prompt box. Browser remains open for manual interaction.")
+                else:
+                    # Save Phase 1 text if only Phase 1 was requested
+                    phase_1_text = await wait_for_claude_response(page, expected_turn=1, timeout_seconds=180)
+                    if phase_1_text:
+                        script_text = clean_script_output(phase_1_text)
+                        archive_script_output(script_text, project_name=project_name, output_file=output_file)
+
 
         print("\n[+] Browser session is ready. Keeping open for 30 seconds...")
         try:
@@ -459,6 +490,7 @@ if __name__ == "__main__":
     parser.add_argument("--profile", type=str, default=None, help="Chrome profile directory to use (e.g., 'Profile 1', 'Profile 6', 'Default')")
     parser.add_argument("--output", type=str, default="senario.txt", help="Output text file path for saving script (default: 'senario.txt')")
     parser.add_argument("--project", "-p", type=str, default=None, help="Project name or directory inside projects/ workspace")
+    parser.add_argument("--topic", type=str, default=None, help="Specific topic to generate video script for")
     args = parser.parse_args()
 
     asyncio.run(open_claude_and_run_workflow(
@@ -467,4 +499,5 @@ if __name__ == "__main__":
         profile_directory=args.profile,
         output_file=args.output,
         project_name=args.project,
+        topic=args.topic,
     ))

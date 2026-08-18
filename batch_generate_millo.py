@@ -27,7 +27,7 @@ logger = logging.getLogger("batch_generate_millo")
 
 
 def parse_prompts(filepath: str | Path) -> list[tuple[str, str, str]]:
-    """Parse prompts file formatted as [MM:SS] prompt text.
+    """Parse prompts file formatted as [MM:SS] prompt text or line-by-line prompts.
 
     Returns:
         List of (timestamp_key, raw_line_text, prompt_text)
@@ -40,23 +40,47 @@ def parse_prompts(filepath: str | Path) -> list[tuple[str, str, str]]:
     prompts: list[tuple[str, str, str]] = []
     pattern = re.compile(r"^\s*\[(\d{2}):(\d{2})\]\s*(.+)$")
 
-    with open(path, "r", encoding="utf-8") as f:
-        for line_num, line in enumerate(f, 1):
-            line_str = line.strip()
-            if not line_str or line_str.startswith("#"):
-                continue
+    lines_raw = [l.strip() for l in path.read_text(encoding="utf-8").splitlines() if l.strip() and not l.strip().startswith("#")]
+
+    if not lines_raw:
+        return []
+
+    # Check if lines have [MM:SS] timestamp headers
+    has_timestamps = any(pattern.match(l) for l in lines_raw)
+
+    if has_timestamps:
+        for line_str in lines_raw:
             match = pattern.match(line_str)
             if match:
                 mm, ss, prompt_text = match.groups()
-                # Clean prompt text from LLM span artifacts (e.g. [span_10](start_span)[span_10](end_span))
                 clean_prompt = re.sub(r"\[span_\d+\]\(start_span\)|\[span_\d+\]\(end_span\)|\[span_\d+\]", "", prompt_text).strip()
                 key = f"{mm}-{ss}"
                 raw_line = f"[{mm}:{ss}] {clean_prompt}"
                 prompts.append((key, raw_line, clean_prompt))
+    else:
+        # Fallback: Prompts don't have [MM:SS] headers directly on lines.
+        # Try to map them to transcript.txt timestamps in the same project folder.
+        ts_keys = []
+        transcript_path = path.parent / "transcript.txt"
+        if not transcript_path.exists():
+            transcript_path = Path("transcript.txt")
+
+        if transcript_path.exists():
+            for t_line in transcript_path.read_text(encoding="utf-8").splitlines():
+                t_match = pattern.match(t_line.strip())
+                if t_match:
+                    t_mm, t_ss, _ = t_match.groups()
+                    ts_keys.append(f"{t_mm}-{t_ss}")
+
+        for idx, prompt_text in enumerate(lines_raw):
+            clean_prompt = re.sub(r"\[span_\d+\]\(start_span\)|\[span_\d+\]\(end_span\)|\[span_\d+\]", "", prompt_text).strip()
+            if idx < len(ts_keys):
+                key = ts_keys[idx]
             else:
-                logger.warning(
-                    f"Line {line_num} skipped (format must be [MM:SS] prompt): {line_str}"
-                )
+                key = f"frame_{idx+1:03d}"
+
+            raw_line = f"[{key.replace('-', ':')}] {clean_prompt}"
+            prompts.append((key, raw_line, clean_prompt))
 
     return prompts
 
@@ -284,23 +308,26 @@ if __name__ == "__main__":
     # Resolve output_dir (defaults to projects/<ActiveProject>/images)
     output_dir = Path(args.output_dir) if args.output_dir else (proj_dir / "images")
 
-    # Resolve prompts file
+    # Resolve prompts file:
+    # 1. If --prompts argument is passed, use specified file.
+    # 2. If non-empty image_prompts.txt exists in project folder, use image_prompts.txt.
+    # 3. Fallback to transcript.txt.
     if args.prompts:
         prompts_file = Path(args.prompts)
         if not prompts_file.exists() and (proj_dir / args.prompts).exists():
             prompts_file = proj_dir / args.prompts
+    elif (proj_dir / "image_prompts.txt").exists() and (proj_dir / "image_prompts.txt").stat().st_size > 50:
+        prompts_file = proj_dir / "image_prompts.txt"
     elif (proj_dir / "transcript.txt").exists():
         prompts_file = proj_dir / "transcript.txt"
-    elif (proj_dir / "image_prompts.txt").exists():
-        prompts_file = proj_dir / "image_prompts.txt"
-    elif (proj_dir / "prompts.txt").exists():
-        prompts_file = proj_dir / "prompts.txt"
+    elif Path("image_prompts.txt").exists() and Path("image_prompts.txt").stat().st_size > 50:
+        prompts_file = Path("image_prompts.txt")
     elif Path("transcript.txt").exists():
         prompts_file = Path("transcript.txt")
-    elif Path("image_prompts.txt").exists():
-        prompts_file = Path("image_prompts.txt")
     else:
         prompts_file = Path("prompts.txt")
+
+    logger.info(f"[Flow] Using picture prompts file: '{prompts_file.resolve()}'")
 
     # Resolve reference image
     ref_file = Path(args.reference)

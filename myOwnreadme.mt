@@ -35,14 +35,24 @@ Text2Video/
 ### Step 1: Generate Script via Claude (تولید سناریو و ساخت پوشه جدید پروژه)
 python claude_prompt.py --profile "Profile 1" --auto-followup
 
+
+
+#if i want to have my own topic 
+
+python claude_prompt.py --profile "Profile 9" --auto-followup --topic "The Evolutionary Mystery of White Skin"
+
 ### Step 2: Generate Voiceover via ElevenLabs (تولید گویندگی صوتی در پوشه پروژه)
 python elevenlabs_prompt.py --profile "Profile 1" --voice 2styzLg7OSeuhPP6uQ26
 
 ### Step 3: Transcribe Audio & Extract Word Timestamps (ترانویسی و زمان‌بندی کلمه‌ای)
 python transcribe_audio.py
 
-### Step 4: Generate Image Prompts via Claude (مرحله Prompt-Making در کلاد)
+### Step 4: Generate Image Prompts (مرحله Prompt-Making)
+# Option A: Via Claude
 python generate_image_prompts.py --profile "Profile 1"
+
+# Option B: Via Gemini (Nano Banana 2.0 system prompt with Milo master reference)
+python generate_image_prompts-GM.py --profile "Profile 1"
 
 ### Step 5: Batch Generate Images via Google Flow (تولید تصاویر به صورت دسته‌ای)
 python batch_generate_millo.py --profile "Profile 1" --reference milo.jpeg --model nano-banana-2 --delay 8.0
