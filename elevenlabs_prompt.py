@@ -335,13 +335,137 @@ async def generate_and_download_speech(page, output_path: Path = DEFAULT_OUTPUT,
         print(f"[!] If you click Download manually on screen, the file will be downloaded by Chrome.")
 
 
+def generate_speech_via_api(
+    text: str,
+    voice_id: str,
+    output_path: Path,
+    api_key: str = None,
+    model_id: str = "eleven_multilingual_v2",
+    stability: float = 0.5,
+    similarity_boost: float = 0.75,
+    style: float = 0.0,
+    use_speaker_boost: bool = True
+) -> Path:
+    """
+    Synthesize speech using official ElevenLabs REST API directly.
+    Bypasses browser automation for ultra-fast, headless execution.
+    """
+    import json
+    import urllib.request
+    import urllib.error
+
+    # 1. Resolve API key from argument, environment, or .env
+    resolved_api_key = api_key or os.getenv("ELEVENLABS_API_KEY") or os.getenv("ELEVEN_API_KEY")
+    if not resolved_api_key:
+        env_file = Path(".env")
+        if env_file.exists():
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                if line.startswith("ELEVENLABS_API_KEY="):
+                    resolved_api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    break
+
+    if not resolved_api_key:
+        raise ValueError(
+            "ElevenLabs API Key is missing! Please provide --api-key <KEY> or set ELEVENLABS_API_KEY in environment/settings."
+        )
+
+    print(f"\n[⚡ ElevenLabs API] Starting direct API speech synthesis...")
+    print(f"  -> Voice ID: {voice_id}")
+    print(f"  -> Model ID: {model_id}")
+    print(f"  -> Text Length: {len(text)} characters (~{len(text.split())} words)")
+    print(f"  -> Stability: {stability}, Similarity Boost: {similarity_boost}")
+
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=mp3_44100_128"
+
+    payload = {
+        "text": text,
+        "model_id": model_id,
+        "voice_settings": {
+            "stability": float(stability),
+            "similarity_boost": float(similarity_boost),
+            "style": float(style),
+            "use_speaker_boost": bool(use_speaker_boost)
+        }
+    }
+
+    data = json.dumps(payload).encode("utf-8")
+    headers = {
+        "xi-api-key": resolved_api_key,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg",
+        "User-Agent": "Text2Video-Studio/1.0"
+    }
+
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        print("[+] Connecting to https://api.elevenlabs.io ...")
+        with urllib.request.urlopen(req, timeout=120) as response:
+            if response.status != 200:
+                raise RuntimeError(f"ElevenLabs API responded with HTTP {response.status}")
+
+            total_bytes = 0
+            chunk_size = 64 * 1024
+            with open(output_path, "wb") as f_out:
+                while True:
+                    chunk = response.read(chunk_size)
+                    if not chunk:
+                        break
+                    f_out.write(chunk)
+                    total_bytes += len(chunk)
+                    print(f"  [+] Downloaded {total_bytes / 1024:.1f} KB...", end="\r", flush=True)
+
+        print(f"\n[✓] Audio synthesis finished successfully! Saved to: {output_path} ({total_bytes / 1024:.1f} KB)")
+        return output_path
+
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode("utf-8", errors="ignore")
+        print(f"\n[❌ ElevenLabs API Error] HTTP {e.code}: {err_msg}", file=sys.stderr)
+        raise RuntimeError(f"ElevenLabs API Error (HTTP {e.code}): {err_msg}")
+    except Exception as e:
+        print(f"\n[❌ ElevenLabs Error] {e}", file=sys.stderr)
+        raise
+
+
 async def main():
-    parser = argparse.ArgumentParser(description="ElevenLabs TTS Browser Automation & Audio Downloader")
+    parser = argparse.ArgumentParser(
+        description="Synthesize speech with ElevenLabs (via direct REST API or Browser Automation)"
+    )
+    parser.add_argument(
+        "--use-api", "--api",
+        action="store_true",
+        help="Use ElevenLabs official REST API directly instead of browser automation",
+    )
+    parser.add_argument(
+        "--api-key",
+        type=str,
+        default=None,
+        help="ElevenLabs API Key (or set ELEVENLABS_API_KEY environment variable)",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="eleven_multilingual_v2",
+        help="ElevenLabs model ID (default: eleven_multilingual_v2)",
+    )
+    parser.add_argument(
+        "--stability",
+        type=float,
+        default=0.5,
+        help="Voice stability 0.0 - 1.0 (default: 0.5)",
+    )
+    parser.add_argument(
+        "--similarity-boost",
+        type=float,
+        default=0.75,
+        help="Voice similarity boost 0.0 - 1.0 (default: 0.75)",
+    )
     parser.add_argument(
         "--profile",
         type=str,
         default=None,
-        help="Chrome profile directory to use (e.g., 'Profile 1', 'Default')",
+        help="Chrome profile directory to use for browser automation mode",
     )
     parser.add_argument(
         "--voice",
@@ -370,12 +494,12 @@ async def main():
     parser.add_argument(
         "--no-generate",
         action="store_true",
-        help="Skip clicking Generate speech automatically",
+        help="Skip clicking Generate speech automatically (browser mode only)",
     )
     parser.add_argument(
         "--keep-open",
         action="store_true",
-        help="Keep browser open after downloading audio (by default it closes automatically)",
+        help="Keep browser open after downloading audio (browser mode only)",
     )
     args = parser.parse_args()
 
@@ -388,6 +512,34 @@ async def main():
     # Load text content
     scenario_text = load_scenario_text(input_file)
 
+    # Branch 1: Direct API Mode (Fast & Headless)
+    if args.use_api or args.api_key:
+        generate_speech_via_api(
+            text=scenario_text,
+            voice_id=args.voice,
+            output_path=output_file,
+            api_key=args.api_key,
+            model_id=args.model,
+            stability=args.stability,
+            similarity_boost=args.similarity_boost,
+        )
+
+        # Sync both voice.mp3 and Senario.mp3 inside project folder and root fallback
+        try:
+            if output_file.exists():
+                data = output_file.read_bytes()
+                (output_file.parent / "voice.mp3").write_bytes(data)
+                (output_file.parent / "Senario.mp3").write_bytes(data)
+                Path("Senario.mp3").write_bytes(data)
+        except Exception:
+            pass
+
+        print("\n" + "=" * 60)
+        print(f"[✓] ALL STEPS FINISHED! Audio saved to project workspace: {output_file.resolve()}")
+        print("=" * 60 + "\n")
+        return
+
+    # Branch 2: Web Browser Automation Mode
     bm = BrowserManager()
 
     try:

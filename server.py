@@ -450,7 +450,22 @@ def build_step_command(step: str, data: dict) -> str:
         output_file = data.get("output")
         input_flag = f'--input "{input_file}"' if input_file else ""
         output_flag = f'--output "{output_file}"' if output_file else ""
-        return f'python3 -u elevenlabs_prompt.py --profile "{profile}" --voice "{voice}" {input_flag} {output_flag} {proj_flag}'
+
+        use_api = data.get("use_elevenlabs_api") or data.get("use_api") or (data.get("voice_mode") == "api")
+        api_key = data.get("elevenlabs_api_key") or data.get("api_key")
+        model = data.get("voice_model") or data.get("model") or "eleven_multilingual_v2"
+        stability = data.get("stability")
+        similarity = data.get("similarity_boost")
+
+        if use_api or api_key:
+            api_flag = "--use-api"
+            key_flag = f'--api-key "{api_key}"' if api_key else ""
+            model_flag = f'--model "{model}"'
+            stab_flag = f'--stability {stability}' if stability is not None else ""
+            sim_flag = f'--similarity-boost {similarity}' if similarity is not None else ""
+            return f'python3 -u elevenlabs_prompt.py {api_flag} {key_flag} {model_flag} {stab_flag} {sim_flag} --voice "{voice}" {input_flag} {output_flag} {proj_flag}'
+        else:
+            return f'python3 -u elevenlabs_prompt.py --profile "{profile}" --voice "{voice}" {input_flag} {output_flag} {proj_flag}'
 
     elif step == "transcribe":
         model = str(data.get("whisper_model") or data.get("model") or "base").strip()
@@ -563,7 +578,36 @@ def serve_media(filename):
     file_path = BASE_DIR / filename
     if not file_path.exists():
         return jsonify({"error": f"File not found: {filename}"}), 404
-    return send_file(file_path)
+@app.route("/api/elevenlabs/voices", methods=["POST"])
+def get_elevenlabs_voices():
+    """Fetch available custom and library voices for an ElevenLabs API key."""
+    import urllib.request
+    import json
+    data = request.json or {}
+    api_key = data.get("api_key") or os.getenv("ELEVENLABS_API_KEY")
+    if not api_key:
+        return jsonify({"success": False, "error": "No ElevenLabs API key provided"}), 400
+
+    try:
+        req = urllib.request.Request(
+            "https://api.elevenlabs.io/v1/voices",
+            headers={"xi-api-key": api_key, "User-Agent": "Text2Video-Studio/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            voices = body.get("voices", [])
+            formatted = [
+                {
+                    "voice_id": v.get("voice_id"),
+                    "name": v.get("name"),
+                    "category": v.get("category", "custom"),
+                    "preview_url": v.get("preview_url")
+                }
+                for v in voices
+            ]
+            return jsonify({"success": True, "voices": formatted})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":

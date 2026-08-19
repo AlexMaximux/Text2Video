@@ -108,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function init() {
         setupNavigation();
         setupEventListeners();
+        setupVoiceTab();
         loadProjects();
         setupScriptStats();
         setupSubtitlePreview();
@@ -311,6 +312,174 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ElevenLabs Voice Tab & API Mode Setup
+    function setupVoiceTab() {
+        const btnVoiceModeApi = document.getElementById('btnVoiceModeApi');
+        const btnVoiceModeWeb = document.getElementById('btnVoiceModeWeb');
+        const voiceApiFields = document.getElementById('voiceApiFields');
+        const voiceWebFields = document.getElementById('voiceWebFields');
+        const voiceModeBadge = document.getElementById('voiceModeBadge');
+
+        const elevenApiKeyInput = document.getElementById('elevenApiKeyInput');
+        const btnToggleApiKeyVisibility = document.getElementById('btnToggleApiKeyVisibility');
+        const btnFetchVoices = document.getElementById('btnFetchVoices');
+        const voiceModelSelect = document.getElementById('voiceModelSelect');
+
+        const sliderStability = document.getElementById('sliderStability');
+        const sliderSimilarity = document.getElementById('sliderSimilarity');
+        const labelStability = document.getElementById('labelStability');
+        const labelSimilarity = document.getElementById('labelSimilarity');
+
+        const voiceSelect = document.getElementById('voiceSelect');
+        const customVoiceContainer = document.getElementById('customVoiceContainer');
+        const voiceIdInput = document.getElementById('voiceIdInput');
+
+        // Restore saved settings
+        const savedMode = localStorage.getItem('text2video_voice_mode') || 'api';
+        const savedApiKey = localStorage.getItem('text2video_elevenlabs_key') || '';
+        const savedModel = localStorage.getItem('text2video_voice_model') || 'eleven_multilingual_v2';
+        const savedVoiceId = localStorage.getItem('text2video_voice_id') || '2styzLg7OSeuhPP6uQ26';
+
+        if (elevenApiKeyInput) {
+            elevenApiKeyInput.value = savedApiKey;
+            elevenApiKeyInput.addEventListener('input', () => {
+                localStorage.setItem('text2video_elevenlabs_key', elevenApiKeyInput.value.trim());
+            });
+        }
+
+        if (voiceModelSelect) {
+            voiceModelSelect.value = savedModel;
+            voiceModelSelect.addEventListener('change', () => {
+                localStorage.setItem('text2video_voice_model', voiceModelSelect.value);
+            });
+        }
+
+        // Mode Switching
+        const setVoiceMode = (mode) => {
+            localStorage.setItem('text2video_voice_mode', mode);
+            if (mode === 'api') {
+                btnVoiceModeApi?.classList.add('bg-secondary', 'text-on-secondary', 'shadow-md');
+                btnVoiceModeApi?.classList.remove('text-on-surface-variant', 'hover:bg-surface-container-high');
+                btnVoiceModeWeb?.classList.remove('bg-secondary', 'text-on-secondary', 'shadow-md');
+                btnVoiceModeWeb?.classList.add('text-on-surface-variant', 'hover:bg-surface-container-high');
+                voiceApiFields?.classList.remove('hidden');
+                voiceWebFields?.classList.add('hidden');
+                if (voiceModeBadge) {
+                    voiceModeBadge.textContent = 'API MODE';
+                    voiceModeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-secondary/15 text-secondary border border-secondary/30';
+                }
+            } else {
+                btnVoiceModeWeb?.classList.add('bg-secondary', 'text-on-secondary', 'shadow-md');
+                btnVoiceModeWeb?.classList.remove('text-on-surface-variant', 'hover:bg-surface-container-high');
+                btnVoiceModeApi?.classList.remove('bg-secondary', 'text-on-secondary', 'shadow-md');
+                btnVoiceModeApi?.classList.add('text-on-surface-variant', 'hover:bg-surface-container-high');
+                voiceWebFields?.classList.remove('hidden');
+                voiceApiFields?.classList.add('hidden');
+                if (voiceModeBadge) {
+                    voiceModeBadge.textContent = 'BROWSER MODE';
+                    voiceModeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-primary/15 text-primary border border-primary/30';
+                }
+            }
+        };
+
+        if (btnVoiceModeApi) btnVoiceModeApi.addEventListener('click', () => setVoiceMode('api'));
+        if (btnVoiceModeWeb) btnVoiceModeWeb.addEventListener('click', () => setVoiceMode('web'));
+        setVoiceMode(savedMode);
+
+        // API Key Show/Hide
+        if (btnToggleApiKeyVisibility && elevenApiKeyInput) {
+            btnToggleApiKeyVisibility.addEventListener('click', () => {
+                if (elevenApiKeyInput.type === 'password') {
+                    elevenApiKeyInput.type = 'text';
+                    btnToggleApiKeyVisibility.textContent = 'Hide';
+                } else {
+                    elevenApiKeyInput.type = 'password';
+                    btnToggleApiKeyVisibility.textContent = 'Show';
+                }
+            });
+        }
+
+        // Sliders
+        if (sliderStability && labelStability) {
+            sliderStability.addEventListener('input', () => {
+                labelStability.textContent = parseFloat(sliderStability.value).toFixed(2);
+            });
+        }
+        if (sliderSimilarity && labelSimilarity) {
+            sliderSimilarity.addEventListener('input', () => {
+                labelSimilarity.textContent = parseFloat(sliderSimilarity.value).toFixed(2);
+            });
+        }
+
+        // Voice Picker & Custom Voice ID
+        if (voiceSelect) {
+            if (savedVoiceId && Array.from(voiceSelect.options).some(o => o.value === savedVoiceId)) {
+                voiceSelect.value = savedVoiceId;
+            } else if (savedVoiceId) {
+                voiceSelect.value = 'custom';
+                if (customVoiceContainer) customVoiceContainer.classList.remove('hidden');
+                if (voiceIdInput) voiceIdInput.value = savedVoiceId;
+            }
+
+            voiceSelect.addEventListener('change', () => {
+                if (voiceSelect.value === 'custom') {
+                    customVoiceContainer?.classList.remove('hidden');
+                } else {
+                    customVoiceContainer?.classList.add('hidden');
+                    if (voiceIdInput) voiceIdInput.value = voiceSelect.value;
+                    localStorage.setItem('text2video_voice_id', voiceSelect.value);
+                }
+            });
+        }
+
+        if (voiceIdInput) {
+            voiceIdInput.addEventListener('input', () => {
+                localStorage.setItem('text2video_voice_id', voiceIdInput.value.trim());
+            });
+        }
+
+        // Fetch Voices from Account
+        if (btnFetchVoices) {
+            btnFetchVoices.addEventListener('click', async () => {
+                const key = elevenApiKeyInput?.value?.trim();
+                if (!key) {
+                    alert('Please enter your ElevenLabs API key first to fetch your custom voices.');
+                    return;
+                }
+                btnFetchVoices.classList.add('animate-spin', 'text-secondary');
+                try {
+                    const res = await fetch('/api/elevenlabs/voices', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ api_key: key })
+                    });
+                    const data = await res.json();
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to fetch voices');
+                    }
+                    if (data.voices && data.voices.length > 0 && voiceSelect) {
+                        const customOpt = voiceSelect.querySelector('option[value="custom"]');
+                        voiceSelect.innerHTML = '';
+
+                        data.voices.forEach(v => {
+                            const opt = document.createElement('option');
+                            opt.value = v.voice_id;
+                            opt.textContent = `${v.name} (${v.category || 'voice'})`;
+                            voiceSelect.appendChild(opt);
+                        });
+
+                        if (customOpt) voiceSelect.appendChild(customOpt);
+                        alert(`✅ Successfully loaded ${data.voices.length} voices from your ElevenLabs account!`);
+                    }
+                } catch (err) {
+                    alert(`❌ Could not fetch voices: ${err.message}`);
+                } finally {
+                    btnFetchVoices.classList.remove('animate-spin', 'text-secondary');
+                }
+            });
+        }
+    }
+
     // Live word count and reading time stats
     function setupScriptStats() {
         const scriptTextarea = document.getElementById('scriptTextarea');
@@ -462,17 +631,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Audio Player
             const audioPlayerContainer = document.getElementById('audioPlayerContainer');
+            const audioEmptyNotice = document.getElementById('audioEmptyNotice');
             const audioSource = document.getElementById('audioSource');
             const audioPlayer = document.getElementById('audioPlayer');
             if (audioPlayerContainer && audioPlayer && audioSource) {
                 if (data.audio_url) {
                     audioPlayerContainer.classList.remove('hidden');
+                    if (audioEmptyNotice) audioEmptyNotice.classList.add('hidden');
                     if (audioSource.src !== window.location.origin + data.audio_url) {
                         audioSource.src = data.audio_url;
                         audioPlayer.load();
                     }
                 } else {
                     audioPlayerContainer.classList.add('hidden');
+                    if (audioEmptyNotice) audioEmptyNotice.classList.remove('hidden');
                 }
             }
 
@@ -639,14 +811,29 @@ document.addEventListener('DOMContentLoaded', () => {
         const position = document.getElementById('positionSelect')?.value || 'bottom';
         const addCaptions = document.getElementById('addCaptionsCheck')?.checked ?? true;
 
+        const voiceMode = localStorage.getItem('text2video_voice_mode') || 'api';
+        const elevenApiKey = document.getElementById('elevenApiKeyInput')?.value || '';
+        const voiceModel = document.getElementById('voiceModelSelect')?.value || 'eleven_multilingual_v2';
+        const stability = document.getElementById('sliderStability')?.value ? parseFloat(document.getElementById('sliderStability').value) : 0.5;
+        const similarity = document.getElementById('sliderSimilarity')?.value ? parseFloat(document.getElementById('sliderSimilarity').value) : 0.75;
+        const voiceProfile = document.getElementById('voiceProfileSelect')?.value || profile;
+
         const projSelectVal = document.getElementById('projectSelector')?.value;
         const finalProject = activeProject || projSelectVal || 'Why_Aren_t_Humans_Nocturnal';
 
         return {
             project: finalProject,
             topic,
-            profile,
+            profile: voiceMode === 'web' ? voiceProfile : profile,
             voice,
+            voice_mode: voiceMode,
+            use_api: voiceMode === 'api',
+            use_elevenlabs_api: voiceMode === 'api',
+            api_key: elevenApiKey,
+            elevenlabs_api_key: elevenApiKey,
+            voice_model: voiceModel,
+            stability,
+            similarity_boost: similarity,
             whisper_model: whisperModel,
             image_model: imageModel,
             model: imageModel,

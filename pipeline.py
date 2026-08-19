@@ -25,6 +25,9 @@ def main():
     parser = argparse.ArgumentParser(description="Master End-to-End Text2Video Pipeline")
     parser.add_argument("--profile", type=str, default="Profile 1", help="Chrome profile for automation")
     parser.add_argument("--voice", type=str, default="2styzLg7OSeuhPP6uQ26", help="ElevenLabs Voice ID")
+    parser.add_argument("--use-elevenlabs-api", action="store_true", help="Use ElevenLabs REST API instead of browser")
+    parser.add_argument("--elevenlabs-api-key", type=str, default=None, help="ElevenLabs API Key")
+    parser.add_argument("--voice-model", type=str, default="eleven_multilingual_v2", help="ElevenLabs Model ID")
     parser.add_argument("--project", "-p", type=str, default=None, help="Project name or directory inside projects/ workspace")
     parser.add_argument("--add-captions", action="store_true", help="Burn captions into final video")
     parser.add_argument("--font-name", type=str, default="Arial Black", help="Subtitle font family")
@@ -47,7 +50,11 @@ def main():
     proj_flag = f'--project "{proj_name}"'
 
     # Step 2: Voiceover generation via ElevenLabs
-    run_cmd(f'python elevenlabs_prompt.py --profile "{args.profile}" --voice {args.voice} {proj_flag}')
+    if args.use_elevenlabs_api or args.elevenlabs_api_key:
+        api_key_flag = f'--api-key "{args.elevenlabs_api_key}"' if args.elevenlabs_api_key else ""
+        run_cmd(f'python elevenlabs_prompt.py --use-api {api_key_flag} --model "{args.voice_model}" --voice "{args.voice}" {proj_flag}')
+    else:
+        run_cmd(f'python elevenlabs_prompt.py --profile "{args.profile}" --voice "{args.voice}" {proj_flag}')
 
     # Step 3: Transcription & Word Timestamps
     run_cmd(f'python transcribe_audio.py {proj_flag}')

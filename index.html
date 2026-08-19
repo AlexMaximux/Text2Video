@@ -433,30 +433,104 @@
                             <span class="material-symbols-outlined text-secondary">record_voice_over</span>
                             <span>Voice & Audio Studio</span>
                         </h2>
-                        <p class="text-sm text-on-surface-variant">Generate ultra-realistic human voices with ElevenLabs automation.</p>
+                        <p class="text-sm text-on-surface-variant">Generate ultra-realistic human voices via ElevenLabs Direct REST API or Browser Automation.</p>
                     </div>
-                    <button data-step-action="voice" class="glow-button px-5 py-2.5 bg-secondary text-on-secondary font-bold rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg shadow-secondary/20">
+                    <button data-step-action="voice" class="glow-button px-5 py-2.5 bg-secondary text-on-secondary font-bold rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg shadow-secondary/20 cursor-pointer">
                         <span class="material-symbols-outlined text-lg">mic</span>
                         <span>Synthesize Audio</span>
                     </button>
                 </div>
 
+                <!-- Mode Switcher Pill -->
+                <div class="glass-panel p-2 rounded-xl flex items-center gap-2 w-fit border border-outline-variant/30">
+                    <button type="button" id="btnVoiceModeApi" class="px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all bg-secondary text-on-secondary shadow-md cursor-pointer">
+                        <span class="material-symbols-outlined text-sm">bolt</span>
+                        <span>Direct API Mode (Fast & Headless)</span>
+                    </button>
+                    <button type="button" id="btnVoiceModeWeb" class="px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high cursor-pointer">
+                        <span class="material-symbols-outlined text-sm">public</span>
+                        <span>Browser Automation (Web UI)</span>
+                    </button>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Left Config Panel -->
                     <div class="glass-panel p-6 rounded-2xl space-y-4">
-                        <h3 class="font-bold text-sm text-on-surface border-b border-outline-variant/15 pb-3 flex items-center gap-2">
-                            <span class="material-symbols-outlined text-secondary">settings</span>
-                            <span>Voice Settings</span>
+                        <h3 class="font-bold text-sm text-on-surface border-b border-outline-variant/15 pb-3 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-secondary">tune</span>
+                                <span>Voice Configuration</span>
+                            </div>
+                            <span id="voiceModeBadge" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-secondary/15 text-secondary border border-secondary/30">API MODE</span>
                         </h3>
 
-                        <div class="space-y-4">
+                        <!-- Direct API Specific Fields -->
+                        <div id="voiceApiFields" class="space-y-4">
                             <div>
-                                <label class="block text-xs font-mono text-outline mb-1">ElevenLabs Voice Presets</label>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="block text-xs font-mono text-outline">ElevenLabs API Key</label>
+                                    <button type="button" id="btnToggleApiKeyVisibility" class="text-[10px] text-secondary hover:underline cursor-pointer">Show</button>
+                                </div>
+                                <div class="relative">
+                                    <input type="password" id="elevenApiKeyInput" placeholder="sk_... or xi-api-key" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 text-xs font-mono text-on-surface pr-8 focus:border-secondary transition-all"/>
+                                    <button type="button" id="btnFetchVoices" title="Fetch Cloned Voices from Account" class="absolute right-2 top-2 text-outline-variant hover:text-secondary cursor-pointer transition-colors">
+                                        <span class="material-symbols-outlined text-base">cloud_download</span>
+                                    </button>
+                                </div>
+                                <p class="text-[10px] text-outline mt-1">Saved securely in local browser storage.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-mono text-outline mb-1">Model Architecture</label>
+                                <select id="voiceModelSelect" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 text-xs font-mono text-on-surface cursor-pointer">
+                                    <option value="eleven_multilingual_v2" selected>Eleven Multilingual v2 (Best Quality & Accents)</option>
+                                    <option value="eleven_turbo_v2_5">Eleven Turbo v2.5 (High Speed & Low Latency)</option>
+                                    <option value="eleven_flash_v2_5">Eleven Flash v2.5 (Ultra Fast)</option>
+                                    <option value="eleven_monolingual_v1">Eleven Monolingual v1 (English Legacy)</option>
+                                </select>
+                            </div>
+
+                            <div class="space-y-2 pt-1 border-t border-outline-variant/15">
+                                <div class="flex justify-between items-center">
+                                    <label class="text-[11px] font-mono text-outline">Stability</label>
+                                    <span id="labelStability" class="text-[11px] font-mono text-secondary">0.50</span>
+                                </div>
+                                <input type="range" id="sliderStability" min="0.0" max="1.0" step="0.05" value="0.50" class="w-full accent-secondary cursor-pointer"/>
+                            </div>
+
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <label class="text-[11px] font-mono text-outline">Clarity / Similarity</label>
+                                    <span id="labelSimilarity" class="text-[11px] font-mono text-secondary">0.75</span>
+                                </div>
+                                <input type="range" id="sliderSimilarity" min="0.0" max="1.0" step="0.05" value="0.75" class="w-full accent-secondary cursor-pointer"/>
+                            </div>
+                        </div>
+
+                        <!-- Browser Mode Specific Fields -->
+                        <div id="voiceWebFields" class="space-y-4 hidden">
+                            <div>
+                                <label class="block text-xs font-mono text-outline mb-1">Chrome Profile</label>
+                                <select id="voiceProfileSelect" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 text-xs font-mono text-on-surface cursor-pointer">
+                                    <option value="Profile 1" selected>Profile 1</option>
+                                    <option value="Default">Default</option>
+                                    <option value="Profile 2">Profile 2</option>
+                                </select>
+                                <p class="text-[10px] text-outline mt-1">Uses stored ElevenLabs web login cookies.</p>
+                            </div>
+                        </div>
+
+                        <!-- Shared Voice Picker -->
+                        <div class="space-y-4 pt-2 border-t border-outline-variant/15">
+                            <div>
+                                <label class="block text-xs font-mono text-outline mb-1">Voice Profile / Speaker</label>
                                 <select id="voiceSelect" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 text-xs font-mono text-on-surface cursor-pointer">
                                     <option value="2styzLg7OSeuhPP6uQ26" selected>Millo Narrator (2styzLg7OSeuhPP6uQ26)</option>
                                     <option value="21m00Tcm4TlvDq8ikWAM">Rachel (Calm & Natural)</option>
                                     <option value="AZnzlk1XvdvUeBnXmlld">Domi (Energetic Storyteller)</option>
                                     <option value="EXAVITQu4vr4xnSDxMaL">Bella (Expressive & Warm)</option>
                                     <option value="ErXwobaYiN019PkySvjV">Antoni (Deep & Cinematic)</option>
+                                    <option value="TX3LPaxmHKxFdv7VOQHJ">Liam (Articulate & Engaging)</option>
                                     <option value="custom">Custom Voice ID...</option>
                                 </select>
                             </div>
@@ -473,7 +547,7 @@
                         <div>
                             <h3 class="font-bold text-sm text-on-surface border-b border-outline-variant/15 pb-3 flex items-center gap-2">
                                 <span class="material-symbols-outlined text-tertiary">headphones</span>
-                                <span>Generated Audio Track (`voice.mp3`)</span>
+                                <span>Generated Audio Track (`voice.mp3` / `Senario.mp3`)</span>
                             </h3>
                             <div id="audioPlayerContainer" class="hidden mt-6 p-4 bg-surface-container-lowest rounded-xl border border-outline-variant/20 flex flex-col gap-3">
                                 <audio id="audioPlayer" controls class="w-full">
@@ -481,8 +555,16 @@
                                     Your browser does not support audio playback.
                                 </audio>
                             </div>
+                            <div id="audioEmptyNotice" class="mt-6 p-8 text-center border border-dashed border-outline-variant/30 rounded-xl">
+                                <span class="material-symbols-outlined text-4xl text-outline mb-2">graphic_eq</span>
+                                <p class="text-xs text-on-surface-variant font-mono">No synthesized audio detected for the active project yet.</p>
+                                <p class="text-[11px] text-outline mt-1">Select your voice settings on the left and click "Synthesize Audio".</p>
+                            </div>
                         </div>
-                        <p class="text-xs text-on-surface-variant font-mono">Audio file generated by ElevenLabs with browser profile automation.</p>
+                        <p class="text-xs text-on-surface-variant font-mono flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-xs text-secondary">verified</span>
+                            <span>Direct API provides faster audio generation with zero browser window overhead.</span>
+                        </p>
                     </div>
                 </div>
             </section>
@@ -1190,6 +1272,6 @@
     </script>
 
     <!-- Application Script -->
-    <script src="/static/app.js?v=2026081911"></script>
+    <script src="/static/app.js?v=2026081912"></script>
 </body>
 </html>
