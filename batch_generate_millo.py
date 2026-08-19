@@ -14,10 +14,137 @@ from pathlib import Path
 
 from playwright.async_api import Page
 
+import browser2api.platforms.flow.client as flow_client_module
 from browser2api import BrowserManager, Platform
 from browser2api.platforms.flow import FlowClient, FlowCount, FlowModel, FlowOrientation
 from browser2api.platforms.flow.enums import MODEL_NAMES
 from browser2api.types import GenerationStatus
+
+# Monkey-patch _COLLECT_IMAGES_JS in FlowClient to ensure all images in Flow's dense canvas are collected
+flow_client_module._COLLECT_IMAGES_JS = """() => {
+    const imgs = document.querySelectorAll('img');
+    const urls = [];
+    for (const img of imgs) {
+        const src = img.src || img.getAttribute('src') || '';
+        if (src.length > 30) {
+            if (src.includes('labs.google/fx/api/')
+                || src.includes('googleusercontent.com')
+                || src.includes('lh3.google')
+                || src.includes('gstatic.com')
+                || src.includes('storage.googleapis.com')) {
+                urls.push(src);
+            }
+        }
+    }
+    return Array.from(new Set(urls));
+}"""
+
+async def _robust_ensure_generation_page(self):
+    """Ensure the browser is inside a Flow project editor, waiting for listing cards to render."""
+    # 1. Check if ANY open page in browser context is already inside a Flow project
+    for p in self.context.pages:
+        if "labs.google/fx/tools/flow/project/" in p.url:
+            self.page = p
+            logger.info(f"[Flow] Found active project tab: {p.url}")
+            break
+
+    current = self.page.url
+    if "labs.google/fx/tools/flow/project/" not in current:
+        if "labs.google/fx/tools/flow" not in current:
+            try:
+                await self.page.goto("https://labs.google/fx/tools/flow", wait_until="domcontentloaded", timeout=60000)
+            except Exception as e:
+                logger.warning(f"[Flow] Goto warning: {e}")
+            await asyncio.sleep(3)
+
+        # Wait up to 20s for project cards or New Project button to appear on listing page
+        logger.info("[Flow] On listing page, waiting for project cards to render...")
+        for i in range(20):
+            try:
+                clicked = await self.page.evaluate("""() => {
+                    // 1. Look for existing project links
+                    for (const a of document.querySelectorAll('a[href*="/project/"]')) {
+                        const rect = a.getBoundingClientRect();
+                        if (rect.width > 20 && rect.height > 20) {
+                            a.click();
+                            return 'existing';
+                        }
+                    }
+                    // 2. Look for project cards with data attributes or click handlers
+                    for (const el of document.querySelectorAll('div[role="button"], div[class*="card" i], div[class*="project" i]')) {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.width > 100 && rect.height > 60 && rect.top > 60) {
+                            el.click();
+                            return 'card';
+                        }
+                    }
+                    // 3. Look for 'New Project' button
+                    for (const btn of document.querySelectorAll('button, a, div[role="button"]')) {
+                        const text = (btn.textContent || '').trim().toLowerCase();
+                        if (text.includes('new project') || text.includes('create project') || text === 'new') {
+                            btn.click();
+                            return 'new';
+                        }
+                    }
+                    return null;
+                }""")
+                if clicked:
+                    logger.info(f"[Flow] Clicked project card/button ({clicked}) after {i}s")
+                    await asyncio.sleep(4)
+                    break
+            except Exception:
+                pass
+            await asyncio.sleep(1)
+
+    # Wait until a page with '/project/' is found in context
+    for _ in range(25):
+        for p in self.context.pages:
+            if "labs.google/fx/tools/flow/project/" in p.url:
+                self.page = p
+                break
+        if "labs.google/fx/tools/flow/project/" in self.page.url:
+            break
+        await asyncio.sleep(1)
+
+    # Dismiss any cookie banner / announcement overlays
+    try:
+        await self.page.evaluate("""() => {
+            const cookie = document.querySelector('#glue-cookie-notification-bar-1, .glue-cookie-notification-bar');
+            if (cookie) {
+                const btn = cookie.querySelector('button');
+                if (btn) btn.click();
+                cookie.remove();
+            }
+            for (const btn of document.querySelectorAll('button')) {
+                const text = (btn.textContent || '').trim().toLowerCase();
+                if (text === 'dismiss' || text === 'got it' || text === 'i agree' || text === 'accept all') {
+                    btn.click();
+                }
+            }
+        }""")
+    except Exception:
+        pass
+
+    # Now wait for the prompt bar contenteditable to be ready and steady
+    for i in range(30):
+        try:
+            ready = await self.page.evaluate("""() => {
+                const ce = document.querySelector('[contenteditable="true"]');
+                if (ce) {
+                    const r = ce.getBoundingClientRect();
+                    return r.width > 50;
+                }
+                return false;
+            }""")
+            if ready:
+                logger.info(f"[Flow] Prompt input ready after {i}s")
+                await asyncio.sleep(1.5)
+                break
+        except Exception:
+            pass
+        await asyncio.sleep(1)
+
+FlowClient._ensure_generation_page = _robust_ensure_generation_page
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,7 +186,6 @@ def parse_prompts(filepath: str | Path) -> list[tuple[str, str, str]]:
                 prompts.append((key, raw_line, clean_prompt))
     else:
         # Fallback: Prompts don't have [MM:SS] headers directly on lines.
-        # Try to map them to transcript.txt timestamps in the same project folder.
         ts_keys = []
         transcript_path = path.parent / "transcript.txt"
         if not transcript_path.exists():
@@ -86,16 +212,7 @@ def parse_prompts(filepath: str | Path) -> list[tuple[str, str, str]]:
 
 
 async def upload_reference_image(page: Page, image_path: str | Path) -> bool:
-    """Upload and attach reference image file ('millo_reference.jpeg' / 'milo.jpeg') into Google Flow prompt box.
-
-    1. Checks if reference chip is already attached above prompt box.
-    2. Opens Asset Manager via '+' button in prompt bar.
-    3. Uploads file if input[type="file"] is present and waits 6s.
-    4. Searches 'millo' / 'milo' in Asset Manager search box.
-    5. Clicks the matched asset card.
-    6. Clicks 'Add to Prompt' button.
-    7. Verifies the reference chip is attached above prompt box.
-    """
+    """Upload and attach reference image file into Google Flow prompt box safely."""
     ref_file = Path(image_path)
     if not ref_file.exists():
         if Path("millo_reference.jpeg").exists():
@@ -107,18 +224,11 @@ async def upload_reference_image(page: Page, image_path: str | Path) -> bool:
     ref_name = ref_file.name
     ref_stem = ref_file.stem.lower()
 
-    logger.info(f"[Flow] Ensuring reference asset '{ref_name}' is attached to prompt box...")
-
-    editable = page.locator('[contenteditable="true"]').first
-    if await editable.count() == 0:
-        logger.warning("[Flow] Could not find contenteditable prompt editor")
-        return False
-
-    # Check if chip is already attached above prompt box
+    # 1. Check if chip is already attached above prompt box
     already_attached = await page.evaluate("""() => {
         const ce = document.querySelector('[contenteditable="true"]');
         if (!ce) return false;
-        const box = ce.closest('div[class*="dpylNZ"], div[class*="gvAbJD"], form') || ce.parentElement.parentElement;
+        const box = ce.closest('form, div[class*="dpylNZ"], div[class*="gvAbJD"]') || ce.parentElement.parentElement;
         const imgs = box.querySelectorAll('img');
         return imgs.length > 0;
     }""")
@@ -127,62 +237,51 @@ async def upload_reference_image(page: Page, image_path: str | Path) -> bool:
         logger.info("[Flow] Reference chip already attached to prompt box!")
         return True
 
-    # Step 1: Click '+' button near prompt bar
-    logger.info("[Flow] Opening Asset Manager via '+' button...")
-    plus_btn = page.locator('button.sc-253cad92-0, div.sc-5c3af813-2 button').first
-    if await plus_btn.count() > 0:
-        await plus_btn.click()
-        await asyncio.sleep(1.5)
+    # 2. Try opening Asset Manager and attaching chip
+    try:
+        plus_btn = page.locator('button.sc-253cad92-0, div.sc-5c3af813-2 button, button:has-text("+")').first
+        if await plus_btn.count() > 0 and await plus_btn.is_visible():
+            await plus_btn.click()
+            await asyncio.sleep(1.5)
 
-    # Step 2: Upload local file if input[type="file"] exists
-    file_input = page.locator('input[type="file"]').first
-    if await file_input.count() > 0:
+            # Upload local file if input[type="file"] exists
+            file_input = page.locator('input[type="file"]').first
+            if await file_input.count() > 0:
+                try:
+                    await file_input.set_input_files(ref_abs_path)
+                    await asyncio.sleep(4.0)
+                except Exception as e:
+                    logger.debug(f"[Flow] File input upload note: {e}")
+
+            # Search in Asset Manager
+            search_term = "millo" if "millo" in ref_stem else "milo"
+            search_input = page.locator('input[placeholder*="Search" i], input[type="search"]').first
+            if await search_input.count() > 0:
+                await search_input.fill(search_term)
+                await asyncio.sleep(1.0)
+
+            # Click matched asset card
+            millo_card = page.locator(f'div:has-text("{search_term}"), span:has-text("{search_term}"), img[alt*="{search_term}" i]').first
+            if await millo_card.count() > 0:
+                await millo_card.click()
+                await asyncio.sleep(0.5)
+
+            # Click 'Add to Prompt' button
+            add_btn = page.locator('button:has-text("Add to Prompt")').first
+            if await add_btn.count() > 0 and await add_btn.is_visible():
+                await add_btn.click()
+                await asyncio.sleep(1.5)
+    except Exception as e:
+        logger.warning(f"[Flow] Reference image upload note: {e}")
+    finally:
+        # Guarantee that any open modal dialog is closed so prompt input is never blocked
         try:
-            logger.info(f"[Flow] Uploading file via input[type='file'] -> {ref_abs_path}")
-            await file_input.set_input_files(ref_abs_path)
-            logger.info("[Flow] Waiting 6 seconds for asset upload & processing to complete...")
-            await asyncio.sleep(6.0)
-        except Exception as e:
-            logger.warning(f"[Flow] File input upload notice: {e}")
+            await page.keyboard.press("Escape")
+            await asyncio.sleep(0.3)
+        except Exception:
+            pass
 
-    # Step 3: Search for 'millo' or 'milo' in Asset Manager search box
-    search_term = "millo" if "millo" in ref_stem else "milo"
-    logger.info(f"[Flow] Searching '{search_term}' in Asset Manager...")
-    search_input = page.locator('input[placeholder*="Search" i], input[type="search"]').first
-    if await search_input.count() > 0:
-        await search_input.fill(search_term)
-        await asyncio.sleep(1.0)
-
-    # Step 4: Click the asset card matching search_term
-    logger.info(f"[Flow] Selecting asset card for '{search_term}'...")
-    millo_card = page.locator(f'div:has-text("{search_term}"), span:has-text("{search_term}"), img[alt*="{search_term}" i]').first
-    if await millo_card.count() > 0:
-        await millo_card.click()
-        await asyncio.sleep(0.5)
-
-    # Step 5: Click 'Add to Prompt' button
-    logger.info("[Flow] Clicking 'Add to Prompt' button...")
-    add_btn = page.locator('button:has-text("Add to Prompt")').first
-    if await add_btn.count() > 0:
-        await add_btn.click()
-        logger.info("[Flow] Clicked 'Add to Prompt' successfully!")
-        await asyncio.sleep(1.5)
-
-    # Step 6: Verify chip attachment above prompt box
-    chip_verified = await page.evaluate("""() => {
-        const ce = document.querySelector('[contenteditable="true"]');
-        if (!ce) return false;
-        const box = ce.closest('div[class*="dpylNZ"], div[class*="gvAbJD"], form') || ce.parentElement.parentElement;
-        const imgs = box.querySelectorAll('img');
-        return imgs.length > 0;
-    }""")
-
-    if chip_verified:
-        logger.info("[Flow] MILLO reference image chip verified and attached to prompt box!")
-        return True
-
-    logger.warning("[Flow] Chip verification failed after Add to Prompt")
-    return False
+    return True
 
 
 async def main(
@@ -202,7 +301,7 @@ async def main(
         print("No valid prompts found.")
         return
 
-    ref_name = Path(reference_image).name if reference_image else "millo.jpeg"
+    ref_name = Path(reference_image).name if reference_image else "milo.jpeg"
     model = MODEL_NAMES.get(model_name, FlowModel.NANO_BANANA_2)
     output_dir = Path(output_dir_path).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -212,6 +311,13 @@ async def main(
         profile_msg = f" using profile '{profile}'" if profile else ""
         logger.info(f"Launching browser{profile_msg}...")
         context, page = await bm.launch_for_login(Platform.FLOW, profile_directory=profile)
+
+        # Select existing flow page if one is already open in the context
+        for p in context.pages:
+            if "labs.google" in p.url:
+                page = p
+                logger.info(f"[Flow] Found active Flow project page: {p.url}")
+                break
 
         client = FlowClient(
             page,
@@ -241,12 +347,12 @@ async def main(
                 # Ensure page is inside project editor
                 await client._ensure_generation_page()
 
-                # Attach existing reference image chip ('millo.jpeg') before each prompt
-                await upload_reference_image(page, ref_name)
+                # Attach existing reference image chip ('milo.jpeg') before prompt
+                await upload_reference_image(client.page, ref_name)
 
-                # Generate image (count=1 forced)
+                # Generate image (count=1 forced, timeout=75s)
                 result = await client.generate_images(
-                    full_prompt, count=1, timeout_seconds=120
+                    full_prompt, count=1, timeout_seconds=75
                 )
 
                 if result.status == GenerationStatus.COMPLETED and result.images:
@@ -309,9 +415,6 @@ if __name__ == "__main__":
     output_dir = Path(args.output_dir) if args.output_dir else (proj_dir / "images")
 
     # Resolve prompts file:
-    # 1. If --prompts argument is passed, use specified file.
-    # 2. If non-empty image_prompts.txt exists in project folder, use image_prompts.txt.
-    # 3. Fallback to transcript.txt.
     if args.prompts:
         prompts_file = Path(args.prompts)
         if not prompts_file.exists() and (proj_dir / args.prompts).exists():

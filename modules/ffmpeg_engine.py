@@ -157,20 +157,26 @@ def render_slideshow(
             "-filter_complex_script", tmp_script_path,
             "-map", "[v]",
             "-c:v", "libx264",
-            "-preset", "medium",
+            "-preset", "fast",
             "-crf", "23",
             str(out_file)
         ])
 
-        result = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
         )
+        for line in proc.stdout:
+            clean_l = line.strip()
+            if clean_l and ("frame=" in clean_l or "time=" in clean_l or "fps=" in clean_l or "speed=" in clean_l or "error" in clean_l.lower()):
+                print(f"[FFmpeg Slideshow] {clean_l}", flush=True)
 
-        if result.returncode != 0:
-            raise RuntimeError(f"FFmpeg rendering failed:\n{result.stderr}")
+        proc.wait()
+        if proc.returncode != 0:
+            raise RuntimeError(f"FFmpeg rendering failed with return code {proc.returncode}")
 
         return out_file
 

@@ -34,3 +34,10 @@ ENV/
 # Logs
 *.log
 errors.log
+
+# Scratch & Temporary test scripts
+scratch/
+browser_verification/
+
+# Large generated media
+*.mp4

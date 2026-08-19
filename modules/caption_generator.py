@@ -334,24 +334,47 @@ def burn_captions(
         .replace(",", "\\,")
     )
 
+    fonts_dir = Path("fonts").resolve()
+    vf_filter = f"subtitles='{escaped_ass}'"
+    if fonts_dir.exists() and any(fonts_dir.glob("*.ttf")):
+        escaped_fonts_dir = (
+            str(fonts_dir)
+            .replace("\\", "/")
+            .replace("'", "'\\''")
+            .replace(":", "\\:")
+            .replace("[", "\\[")
+            .replace("]", "\\]")
+            .replace(",", "\\,")
+        )
+        vf_filter += f":fontsdir='{escaped_fonts_dir}'"
+
     cmd = [
         "ffmpeg",
         "-y",
         "-i", str(in_video),
-        "-vf", f"subtitles=filename={escaped_ass}",
+        "-vf", vf_filter,
         "-c:v", "libx264",
-        "-preset", "medium",
+        "-preset", "fast",
         "-crf", "18",
         "-c:a", "copy",
         str(out_video)
     ]
 
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"FFmpeg caption burn-in failed with return code {result.returncode}.\n"
-            f"Error log:\n{result.stderr}"
-        )
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1
+    )
+    for line in proc.stdout:
+        clean_l = line.strip()
+        if clean_l and ("frame=" in clean_l or "time=" in clean_l or "fps=" in clean_l or "speed=" in clean_l or "error" in clean_l.lower()):
+            print(f"[FFmpeg Subtitles] {clean_l}", flush=True)
+
+    proc.wait()
+    if proc.returncode != 0:
+        raise RuntimeError(f"FFmpeg caption burn-in failed with return code {proc.returncode}")
 
     return out_video
 

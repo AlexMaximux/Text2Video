@@ -121,7 +121,7 @@ def mux_audio(
             str(out_path)
         ])
     else:
-        # Video is longer or equal to audio: fast stream copy
+        # Video is longer or equal to audio: stream copy video with audio muxing (instantaneous)
         extend_by = 0.0
         was_extended = False
         cmd.extend([
@@ -129,12 +129,24 @@ def mux_audio(
             "-map", "1:a:0",
             "-c:v", "copy",
             "-c:a", "aac",
-            "-shortest",
+            "-t", f"{effective_audio_dur:.4f}",
             str(out_path)
         ])
 
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg audio muxing failed:\n{result.stderr}")
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1
+    )
+    for line in proc.stdout:
+        clean_l = line.strip()
+        if clean_l and ("frame=" in clean_l or "time=" in clean_l or "fps=" in clean_l or "speed=" in clean_l or "error" in clean_l.lower()):
+            print(f"[FFmpeg Audio] {clean_l}", flush=True)
+
+    proc.wait()
+    if proc.returncode != 0:
+        raise RuntimeError(f"FFmpeg audio muxing failed with return code {proc.returncode}")
 
     return out_path, video_duration, audio_duration, duration_diff, was_extended, extend_by

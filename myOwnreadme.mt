@@ -47,12 +47,16 @@ python elevenlabs_prompt.py --profile "Profile 1" --voice 2styzLg7OSeuhPP6uQ26
 ### Step 3: Transcribe Audio & Extract Word Timestamps (ترانویسی و زمان‌بندی کلمه‌ای)
 python transcribe_audio.py
 
-### Step 4: Generate Image Prompts (مرحله Prompt-Making)
-# Option A: Via Claude
-python generate_image_prompts.py --profile "Profile 1"
+python transcribe_audio.py \
+    --audio /root/abc.mp3 \
+    --model medium \
+    --output-transcript ./video1/senario.txt \
+    --output-words ./video1/words.json \
+    --project my_project      # if you have a specific project folder
 
-# Option B: Via Gemini (Nano Banana 2.0 system prompt with Milo master reference)
-python generate_image_prompts-GM.py --profile "Profile 1"
+
+### Step 4: Generate Image Prompts via Claude (مرحله Prompt-Making در کلاد)
+python generate_image_prompts.py --profile "Profile 1"
 
 ### Step 5: Batch Generate Images via Google Flow (تولید تصاویر به صورت دسته‌ای)
 python batch_generate_millo.py --profile "Profile 1" --reference milo.jpeg --model nano-banana-2 --delay 8.0

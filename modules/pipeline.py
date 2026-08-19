@@ -92,6 +92,10 @@ class SlideshowPipeline:
             on_mismatch=on_mismatch
         )
 
+        print(f"[+] Loaded {len(image_paths)} images and {len(timestamps)} timestamps.", flush=True)
+        total_calc_dur = sum(s.duration for s in segments)
+        print(f"[+] Total slideshow duration: {total_calc_dur:.2f} seconds ({len(segments)} segments).", flush=True)
+
         # Apply pre-process hooks
         for hook in self.pre_process_hooks:
             segments = hook(segments)
@@ -109,15 +113,14 @@ class SlideshowPipeline:
                 raw_video_path = final_out_path.parent / f"{final_out_path.stem}_silent.mp4"
                 temp_created = False
             else:
-                # Collision-safe temporary file
-                with tempfile.NamedTemporaryFile(prefix="slideshow_raw_", suffix=".mp4", delete=False) as tmp:
-                    raw_video_path = Path(tmp.name)
+                tmp_silent = tempfile.NamedTemporaryFile(suffix=".mp4", prefix="slideshow_raw_", delete=False)
+                raw_video_path = Path(tmp_silent.name)
                 temp_created = True
         else:
             raw_video_path = final_out_path
             temp_created = False
 
-        # Render raw video slideshow using FFmpeg engine
+        print(f"[+] [1/3] Rendering video slideshow frames with FFmpeg...", flush=True)
         rendered_video = render_slideshow(
             segments=segments,
             output_path=raw_video_path,
@@ -125,6 +128,7 @@ class SlideshowPipeline:
             fps=fps,
             additional_filters=additional_filters
         )
+        print(f"[✓] [1/3] Video slideshow frames rendered successfully.", flush=True)
 
         v_dur = segments[-1].end_time if segments else 0.0
         a_dur = None
@@ -134,13 +138,15 @@ class SlideshowPipeline:
 
         # If audio_path is provided, run audio_muxer post-render step
         if audio_path:
+            print(f"[+] [2/3] Multiplexing audio track '{audio_path}'...", flush=True)
             try:
-                final_path, v_dur, a_dur, diff, was_extended, extend_by = mux_audio(
+                final_out_path, v_dur, a_dur, diff, was_extended, extend_by = mux_audio(
                     video_path=rendered_video,
                     audio_path=audio_path,
                     output_path=final_out_path,
                     offset=audio_offset
                 )
+                print(f"[✓] [2/3] Audio track multiplexed successfully.", flush=True)
             finally:
                 # Cleanup temp file if created
                 if temp_created and raw_video_path.exists():
@@ -155,6 +161,7 @@ class SlideshowPipeline:
 
         # Burn word-highlighted captions if requested
         if add_captions:
+            print(f"[+] [3/3] Burning timed karaoke subtitles into final video...", flush=True)
             if not words_json_path or not Path(words_json_path).is_file():
                 raise ValueError(
                     "Word captions enabled (--add-captions), but no valid words JSON file was provided. "
@@ -169,15 +176,19 @@ class SlideshowPipeline:
                 except ValueError:
                     pass
 
+            source_video = final_out_path if final_out_path.exists() else rendered_video
+            if not source_video.exists():
+                raise FileNotFoundError(f"Cannot burn captions: source video file not found at '{final_out_path}' or '{rendered_video}'")
+
             if keep_temp:
                 uncaptioned_path = final_out_path.parent / f"{final_out_path.stem}_uncaptioned.mp4"
                 temp_uncaptioned = False
-                os.replace(final_out_path, uncaptioned_path)
+                os.replace(source_video, uncaptioned_path)
             else:
                 with tempfile.NamedTemporaryFile(prefix="slideshow_uncaptioned_", suffix=".mp4", delete=False) as tmp:
                     uncaptioned_path = Path(tmp.name)
                 temp_uncaptioned = True
-                os.replace(final_out_path, uncaptioned_path)
+                os.replace(source_video, uncaptioned_path)
 
             try:
                 generate_captioned_video(

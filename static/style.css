@@ -1,0 +1,141 @@
+/* Custom Styling for Text2Video Web UI based on Stitch Design System */
+
+.glass-panel {
+    background: rgba(23, 31, 51, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-subtle {
+    background: rgba(19, 27, 46, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glow-hover {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glow-hover:hover {
+    box-shadow: 0 0 25px rgba(77, 142, 255, 0.25);
+    border-color: rgba(173, 198, 255, 0.5);
+}
+
+.glow-button {
+    position: relative;
+    box-shadow: 0 0 15px rgba(77, 142, 255, 0.3);
+    transition: all 0.2s ease;
+}
+
+.glow-button:hover {
+    box-shadow: 0 0 25px rgba(77, 142, 255, 0.5);
+    transform: translateY(-1px);
+}
+
+.glow-button:active {
+    transform: translateY(0);
+    opacity: 0.9;
+}
+
+.pulse-dot {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(77, 142, 255, 0.7); }
+    70% { box-shadow: 0 0 0 8px rgba(77, 142, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(77, 142, 255, 0); }
+}
+
+.pulse-dot-success {
+    animation: pulse-success 2s infinite;
+}
+
+@keyframes pulse-success {
+    0% { box-shadow: 0 0 0 0 rgba(78, 222, 163, 0.7); }
+    70% { box-shadow: 0 0 0 8px rgba(78, 222, 163, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(78, 222, 163, 0); }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0b1326;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #2d3449;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #424754;
+}
+
+/* Monospace font output */
+.font-mono-code {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Active Nav Item */
+.nav-tab-active {
+    background: rgba(77, 142, 255, 0.15);
+    color: #adc6ff;
+    border-left: 3px solid #4d8eff;
+}
+
+.nav-tab-inactive {
+    color: #c2c6d6;
+}
+
+.nav-tab-inactive:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #dae2fd;
+}
+
+/* Animations */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+
+/* Subtitle Preset Buttons */
+.subtitle-preset-btn {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.subtitle-preset-btn.active-preset {
+    border-color: #4d8eff !important;
+    background: rgba(77, 142, 255, 0.18) !important;
+    box-shadow: 0 0 12px rgba(77, 142, 255, 0.35);
+}
+
+/* Subtitle Preview Words */
+.sub-word-item {
+    display: inline-block;
+    cursor: pointer;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    letter-spacing: -0.01em;
+}
+
+.sub-word-item:hover {
+    transform: scale(1.08);
+}
+
+.sub-word-active {
+    transform: scale(1.12);
+    display: inline-block;
+    z-index: 10;
+}
+
