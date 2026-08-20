@@ -341,13 +341,74 @@
                             <span class="material-symbols-outlined text-primary">description</span>
                             <span>Script Generator & Timestamps</span>
                         </h2>
-                        <p class="text-sm text-on-surface-variant">Write or auto-generate viral scripts with Claude AI and generate word-level timestamp maps.</p>
+                        <p class="text-sm text-on-surface-variant">Generate viral narration scripts from your own custom topic or let Claude AI brainstorm fresh ideas.</p>
                     </div>
                     <div class="flex items-center gap-3">
-                        <button data-step-action="script" class="glow-button px-4 py-2 bg-primary text-on-primary font-bold rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg shadow-primary/20">
+                        <button type="button" id="btnBrainstormTopics" class="px-4 py-2 bg-surface-container-high hover:bg-surface-bright text-on-surface font-semibold rounded-xl text-xs flex items-center gap-2 transition-all border border-outline-variant/30 cursor-pointer">
+                            <span class="material-symbols-outlined text-base text-primary">psychology</span>
+                            <span>AI Brainstorm Topics</span>
+                        </button>
+                        <button data-step-action="script" id="btnGenerateScriptMain" class="glow-button px-5 py-2.5 bg-primary text-on-primary font-bold rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg shadow-primary/20 cursor-pointer">
                             <span class="material-symbols-outlined text-base">auto_awesome</span>
                             <span>Generate Script</span>
                         </button>
+                    </div>
+                </div>
+
+                <!-- Topic Mode Switcher & Custom Topic Input Card -->
+                <div class="glass-panel p-6 rounded-2xl space-y-4 border border-primary/20 bg-primary/5">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-outline-variant/15 pb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">psychology_alt</span>
+                            <span class="font-bold text-sm text-on-surface">Topic & Script Customization</span>
+                        </div>
+                        <!-- Mode toggle -->
+                        <div class="flex items-center gap-1.5 bg-surface-container-lowest p-1 rounded-lg border border-outline-variant/30 text-[11px] font-mono">
+                            <button type="button" id="btnTopicModeCustom" class="px-3 py-1 rounded-md bg-primary text-on-primary font-bold transition-all cursor-pointer">My Custom Topic</button>
+                            <button type="button" id="btnTopicModeAuto" class="px-3 py-1 rounded-md text-on-surface-variant hover:text-on-surface transition-all cursor-pointer">AI Auto-Discover</button>
+                        </div>
+                    </div>
+
+                    <div id="customTopicContainer" class="space-y-3">
+                        <div>
+                            <div class="flex justify-between items-center mb-1.5">
+                                <label for="topicInput" class="text-xs font-mono font-semibold text-on-surface flex items-center gap-1.5">
+                                    <span>Your Custom Video Topic / Question:</span>
+                                    <span class="text-[10px] text-primary font-normal">(Claude will write the full script specifically on this topic)</span>
+                                </label>
+                                <button type="button" id="btnClearTopic" class="text-[11px] text-outline hover:text-error transition-colors cursor-pointer">Clear</button>
+                            </div>
+                            <div class="relative">
+                                <input type="text" id="topicInput" placeholder="e.g. The Evolutionary Mystery of White Skin, or Why did ancient humans sleep twice a night?" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-3 text-xs text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-24 font-medium"/>
+                                <button type="button" id="btnApplyTopicPrompt" data-step-action="script" class="absolute right-2 top-2 px-3 py-1.5 bg-primary/20 hover:bg-primary text-primary hover:text-on-primary rounded-lg text-[11px] font-mono font-bold transition-all flex items-center gap-1 cursor-pointer">
+                                    <span>Run</span>
+                                    <span class="material-symbols-outlined text-xs">arrow_forward</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Viral Angle Starter Chips -->
+                        <div class="space-y-1.5">
+                            <span class="text-[11px] font-mono text-outline">Click an angle starter to fill:</span>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" class="topic-chip px-2.5 py-1 rounded-lg text-[11px] font-mono bg-surface-container-lowest hover:bg-primary/15 hover:text-primary text-on-surface-variant border border-outline-variant/30 transition-all cursor-pointer" data-template="What did ancient humans actually ">⏳ What did ancient humans actually ___?</button>
+                                <button type="button" class="topic-chip px-2.5 py-1 rounded-lg text-[11px] font-mono bg-surface-container-lowest hover:bg-primary/15 hover:text-primary text-on-surface-variant border border-outline-variant/30 transition-all cursor-pointer" data-template="Why can't you ">❓ Why can't you ___?</button>
+                                <button type="button" class="topic-chip px-2.5 py-1 rounded-lg text-[11px] font-mono bg-surface-container-lowest hover:bg-primary/15 hover:text-primary text-on-surface-variant border border-outline-variant/30 transition-all cursor-pointer" data-template="The  Effect">🧠 The ___ Effect</button>
+                                <button type="button" class="topic-chip px-2.5 py-1 rounded-lg text-[11px] font-mono bg-surface-container-lowest hover:bg-primary/15 hover:text-primary text-on-surface-variant border border-outline-variant/30 transition-all cursor-pointer" data-template="What if we are still ">🌍 What if we are still ___?</button>
+                                <button type="button" class="topic-chip px-2.5 py-1 rounded-lg text-[11px] font-mono bg-surface-container-lowest hover:bg-primary/15 hover:text-primary text-on-surface-variant border border-outline-variant/30 transition-all cursor-pointer" data-template="You never noticed that ">👁️ You never noticed that ___</button>
+                            </div>
+                        </div>
+
+                        <!-- Previous History Topics Selector -->
+                        <div class="pt-2 border-t border-outline-variant/15 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-xs text-outline">history</span>
+                                <span class="text-[11px] font-mono text-outline">Previously Created Topics:</span>
+                            </div>
+                            <select id="historyTopicsSelect" class="bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-2.5 py-1 text-[11px] font-mono text-on-surface max-w-md cursor-pointer">
+                                <option value="">Select past topic to reload or use as inspiration...</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -363,31 +424,26 @@
                                 <span id="scriptWordCount">0 words</span>
                                 <span class="text-outline-variant">•</span>
                                 <span id="scriptReadTime">0 min read</span>
-                                <button id="btnSaveScript" class="px-3 py-1 bg-surface-container-high hover:bg-surface-bright text-on-surface rounded-lg border border-outline-variant/30 transition-all flex items-center gap-1">
+                                <button id="btnSaveScript" class="px-3 py-1 bg-surface-container-high hover:bg-surface-bright text-on-surface rounded-lg border border-outline-variant/30 transition-all flex items-center gap-1 cursor-pointer">
                                     <span class="material-symbols-outlined text-xs">save</span>
                                     <span>Save</span>
                                 </button>
                             </div>
                         </div>
-                        <textarea id="scriptTextarea" rows="14" class="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-4 font-mono text-xs text-on-surface focus:border-primary focus:ring-1 focus:ring-primary leading-relaxed" placeholder="Type your script here, or click 'Generate Script' to prompt Claude AI..."></textarea>
+                        <textarea id="scriptTextarea" rows="14" class="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-4 font-mono text-xs text-on-surface focus:border-primary focus:ring-1 focus:ring-primary leading-relaxed" placeholder="Type your script here, or enter a custom topic above and click 'Generate Script'..."></textarea>
                     </div>
 
                     <!-- Topic & Transcribe Control Sidebar -->
                     <div class="glass-panel p-6 rounded-2xl space-y-5">
                         <h3 class="font-bold text-sm text-on-surface border-b border-outline-variant/15 pb-3 flex items-center gap-2">
                             <span class="material-symbols-outlined text-secondary">tune</span>
-                            <span>Script & Sync Settings</span>
+                            <span>Pipeline Settings</span>
                         </h3>
 
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-xs font-mono text-outline mb-1">Topic / Narrative Prompt</label>
-                                <input type="text" id="topicInput" placeholder="e.g. Why aren't humans nocturnal?" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 text-xs text-on-surface focus:border-primary focus:ring-1 focus:ring-primary"/>
-                            </div>
-
-                            <div>
                                 <label class="block text-xs font-mono text-outline mb-1">Chrome Browser Profile</label>
-                                <input type="text" id="profileInput" value="Profile 1" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 text-xs font-mono text-on-surface focus:border-primary focus:ring-1 focus:ring-primary"/>
+                                <input type="text" id="scriptProfileInput" value="Profile 1" class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 text-xs font-mono text-on-surface focus:border-primary focus:ring-1 focus:ring-primary"/>
                             </div>
 
                             <div class="pt-2 border-t border-outline-variant/15">
@@ -400,12 +456,12 @@
                                 </select>
                             </div>
 
-                            <button data-step-action="transcribe" class="w-full py-2.5 bg-surface-container-highest hover:bg-secondary/20 text-on-surface border border-outline-variant/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                            <button data-step-action="transcribe" class="w-full py-2.5 bg-surface-container-highest hover:bg-secondary/20 text-on-surface border border-outline-variant/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer">
                                 <span class="material-symbols-outlined text-sm text-secondary">timer</span>
                                 <span>Run Audio Timestamp Sync</span>
                             </button>
 
-                            <button data-step-action="prompts" class="w-full py-2.5 bg-surface-container-highest hover:bg-primary/20 text-on-surface border border-outline-variant/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                            <button data-step-action="prompts" class="w-full py-2.5 bg-surface-container-highest hover:bg-primary/20 text-on-surface border border-outline-variant/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer">
                                 <span class="material-symbols-outlined text-sm text-primary">photo_filter</span>
                                 <span>Generate Scene Prompts</span>
                             </button>
@@ -1272,6 +1328,6 @@
     </script>
 
     <!-- Application Script -->
-    <script src="/static/app.js?v=2026081912"></script>
+    <script src="/static/app.js?v=2026082001"></script>
 </body>
 </html>

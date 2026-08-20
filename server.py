@@ -610,6 +610,19 @@ def get_elevenlabs_voices():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/api/history-topics", methods=["GET"])
+def get_history_topics():
+    """Return all previously generated topic titles from history_topics.txt."""
+    history_file = BASE_DIR / "history_topics.txt"
+    topics = []
+    if history_file.exists():
+        for line in history_file.read_text(encoding="utf-8").splitlines():
+            line_clean = line.strip()
+            if line_clean and line_clean not in topics:
+                topics.append(line_clean)
+    return jsonify({"success": True, "topics": topics})
+
+
 if __name__ == "__main__":
     if "--check" in sys.argv:
         print("Flask app syntax check passed successfully.")

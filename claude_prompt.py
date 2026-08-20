@@ -98,9 +98,18 @@ TONE AND STYLE RULES:
 - All text must be in English."""
 
 
-PROMPT_PHASE_2_SELECT = """choose one of them that you think it would have most potential to have more views and debate in Youtube and BUILD THE SCRIPT
+def build_phase_2_prompt(topic: str | None = None) -> str:
+    """Build Phase 2 selection prompt, explicitly targeting the requested custom topic if provided."""
+    if topic:
+        return f"""Choose the single best title idea from above that best develops the requested topic "{topic}" for maximum viral engagement and curiosity on YouTube, and BUILD THE COMPLETE SCRIPT.
+
+The output must be ONLY the Title on line 1, followed immediately by the pure voiceover Narration Script without any intro or outro commentary, stage directions, or section headers."""
+    else:
+        return """choose one of them that you think it would have most potential to have more views and debate in Youtube and BUILD THE SCRIPT
 
 The output just should be the Titel and ready Script not any extra information at the first or end"""
+
+PROMPT_PHASE_2_SELECT = build_phase_2_prompt()
 
 HISTORY_FILE = Path("history_topics.txt")
 OUTPUTS_DIR = Path("outputs")
@@ -424,10 +433,11 @@ async def open_claude_and_run_workflow(
                                 continue
 
                         if input_element_2:
-                            print(f"[+] Inserting Phase 2 prompt:\n    \"{PROMPT_PHASE_2_SELECT}\"")
+                            phase_2_prompt = build_phase_2_prompt(topic)
+                            print(f"[+] Inserting Phase 2 prompt:\n    \"{phase_2_prompt}\"")
                             await input_element_2.focus()
                             await asyncio.sleep(0.5)
-                            await page.keyboard.insert_text(PROMPT_PHASE_2_SELECT)
+                            await page.keyboard.insert_text(phase_2_prompt)
 
                             await asyncio.sleep(1)
                             print("[+] Sending Phase 2 prompt...")

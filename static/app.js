@@ -108,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function init() {
         setupNavigation();
         setupEventListeners();
+        setupScriptCustomTopic();
         setupVoiceTab();
         loadProjects();
         setupScriptStats();
@@ -310,6 +311,120 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnRunPipeline) {
             btnRunPipeline.addEventListener('click', triggerFullPipeline);
         }
+    }
+
+    // Custom Topic & Script Generator Setup
+    function setupScriptCustomTopic() {
+        const topicInput = document.getElementById('topicInput');
+        const btnTopicModeCustom = document.getElementById('btnTopicModeCustom');
+        const btnTopicModeAuto = document.getElementById('btnTopicModeAuto');
+        const btnClearTopic = document.getElementById('btnClearTopic');
+        const btnBrainstormTopics = document.getElementById('btnBrainstormTopics');
+        const historyTopicsSelect = document.getElementById('historyTopicsSelect');
+
+        // Restore last topic if saved
+        const savedTopic = localStorage.getItem('text2video_last_topic') || '';
+        if (topicInput && savedTopic && !topicInput.value) {
+            topicInput.value = savedTopic;
+        }
+
+        const setTopicMode = (mode) => {
+            if (mode === 'custom') {
+                btnTopicModeCustom?.classList.add('bg-primary', 'text-on-primary', 'font-bold');
+                btnTopicModeCustom?.classList.remove('text-on-surface-variant');
+                btnTopicModeAuto?.classList.remove('bg-primary', 'text-on-primary', 'font-bold');
+                btnTopicModeAuto?.classList.add('text-on-surface-variant');
+            } else {
+                btnTopicModeAuto?.classList.add('bg-primary', 'text-on-primary', 'font-bold');
+                btnTopicModeAuto?.classList.remove('text-on-surface-variant');
+                btnTopicModeCustom?.classList.remove('bg-primary', 'text-on-primary', 'font-bold');
+                btnTopicModeCustom?.classList.add('text-on-surface-variant');
+            }
+        };
+
+        if (btnTopicModeCustom) {
+            btnTopicModeCustom.addEventListener('click', () => {
+                setTopicMode('custom');
+                topicInput?.focus();
+            });
+        }
+        if (btnTopicModeAuto) {
+            btnTopicModeAuto.addEventListener('click', () => {
+                setTopicMode('auto');
+            });
+        }
+
+        if (topicInput) {
+            topicInput.addEventListener('input', () => {
+                const val = topicInput.value.trim();
+                localStorage.setItem('text2video_last_topic', val);
+                if (val) setTopicMode('custom');
+            });
+        }
+
+        if (btnClearTopic && topicInput) {
+            btnClearTopic.addEventListener('click', () => {
+                topicInput.value = '';
+                localStorage.removeItem('text2video_last_topic');
+                setTopicMode('auto');
+                topicInput.focus();
+            });
+        }
+
+        // Angle Starter Chips
+        document.querySelectorAll('.topic-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                const template = chip.getAttribute('data-template');
+                if (topicInput && template) {
+                    topicInput.value = template;
+                    setTopicMode('custom');
+                    topicInput.focus();
+                    topicInput.setSelectionRange(template.length, template.length);
+                }
+            });
+        });
+
+        // Brainstorm AI Topics button
+        if (btnBrainstormTopics) {
+            btnBrainstormTopics.addEventListener('click', () => {
+                if (topicInput) topicInput.value = '';
+                setTopicMode('auto');
+                triggerStep('script');
+            });
+        }
+
+        // Load History Topics
+        const loadHistoryTopics = async () => {
+            if (!historyTopicsSelect) return;
+            try {
+                const res = await fetch('/api/history-topics');
+                const data = await res.json();
+                if (data.success && data.topics && data.topics.length > 0) {
+                    historyTopicsSelect.innerHTML = '<option value="">Select past topic to reload or use as inspiration...</option>';
+                    data.topics.forEach(t => {
+                        const opt = document.createElement('option');
+                        opt.value = t;
+                        opt.textContent = t;
+                        historyTopicsSelect.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to load history topics', err);
+            }
+        };
+
+        if (historyTopicsSelect) {
+            historyTopicsSelect.addEventListener('change', () => {
+                const selected = historyTopicsSelect.value;
+                if (selected && topicInput) {
+                    topicInput.value = selected;
+                    setTopicMode('custom');
+                    topicInput.focus();
+                }
+            });
+        }
+
+        loadHistoryTopics();
     }
 
     // ElevenLabs Voice Tab & API Mode Setup
