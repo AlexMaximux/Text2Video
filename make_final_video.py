@@ -39,8 +39,8 @@ def main():
 
     images_dir = Path(args.images_dir) if args.images_dir else (proj_dir / "images" if (proj_dir / "images").exists() else Path("output"))
     audio_path = Path(args.audio) if args.audio else (
-        proj_dir / "voice.mp3" if (proj_dir / "voice.mp3").exists() else (
-            proj_dir / "Senario.mp3" if (proj_dir / "Senario.mp3").exists() else Path("Senario.mp3")
+        proj_dir / "Senario.mp3" if (proj_dir / "Senario.mp3").exists() else (
+            proj_dir / "voice.mp3" if (proj_dir / "voice.mp3").exists() else Path("Senario.mp3")
         )
     )
     transcript_path = Path(args.transcript) if args.transcript else (proj_dir / "transcript.txt" if (proj_dir / "transcript.txt").exists() else Path("transcript.txt"))

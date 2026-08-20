@@ -27,10 +27,10 @@ def main():
 
     if args.audio:
         audio_path = Path(args.audio)
-    elif (proj_dir / "voice.mp3").exists():
-        audio_path = proj_dir / "voice.mp3"
     elif (proj_dir / "Senario.mp3").exists():
         audio_path = proj_dir / "Senario.mp3"
+    elif (proj_dir / "voice.mp3").exists():
+        audio_path = proj_dir / "voice.mp3"
     else:
         audio_path = Path("Senario.mp3")
 

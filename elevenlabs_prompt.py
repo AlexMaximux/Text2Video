@@ -483,7 +483,7 @@ async def main():
         "--output",
         type=Path,
         default=None,
-        help=f"Path to save output audio file (default: voice.mp3 in project workspace)",
+        help=f"Path to save output audio file (default: Senario.mp3 in project workspace)",
     )
     parser.add_argument(
         "--project", "-p",
@@ -507,7 +507,7 @@ async def main():
     proj_dir = resolve_project_dir(args.project)
 
     input_file = args.input if args.input else (proj_dir / "senario.txt" if (proj_dir / "senario.txt").exists() else Path("senario.txt"))
-    output_file = args.output if args.output else (proj_dir / "voice.mp3")
+    output_file = args.output if args.output else (proj_dir / "Senario.mp3")
 
     # Load text content
     scenario_text = load_scenario_text(input_file)
@@ -524,12 +524,12 @@ async def main():
             similarity_boost=args.similarity_boost,
         )
 
-        # Sync both voice.mp3 and Senario.mp3 inside project folder and root fallback
+        # Sync both Senario.mp3 and voice.mp3 inside project folder and root fallback
         try:
             if output_file.exists():
                 data = output_file.read_bytes()
-                (output_file.parent / "voice.mp3").write_bytes(data)
                 (output_file.parent / "Senario.mp3").write_bytes(data)
+                (output_file.parent / "voice.mp3").write_bytes(data)
                 Path("Senario.mp3").write_bytes(data)
         except Exception:
             pass
@@ -566,12 +566,12 @@ async def main():
         if not args.no_generate:
             await generate_and_download_speech(page, output_path=output_file)
 
-        # Sync both voice.mp3 and Senario.mp3 inside project folder and root fallback
+        # Sync both Senario.mp3 and voice.mp3 inside project folder and root fallback
         try:
             if output_file.exists():
                 data = output_file.read_bytes()
-                (output_file.parent / "voice.mp3").write_bytes(data)
                 (output_file.parent / "Senario.mp3").write_bytes(data)
+                (output_file.parent / "voice.mp3").write_bytes(data)
                 Path("Senario.mp3").write_bytes(data)
         except Exception:
             pass
